@@ -49,35 +49,36 @@ class PW_seq():
         ##################################################################
 
         self.SitDwnSeq1 = copy(self.BasStndPose)
-        self.SitDwnSeq1[1] = 0.1
+        self.SitDwnSeq1[1] = 0.9
         self.SitDwnSeq1[4] = self.BaseHipZ#0.1 ######### NEW #########
         self.SitDwnSeq1[4+6] = -self.BaseHipZ#-0.1 ######### NEW #########
         self.SitDwnSeq1[5] = self.BaseHipZ#0.1 ######### NEW #########
         self.SitDwnSeq1[5+6] = -self.BaseHipZ#-0.1 ######### NEW #########
         # self.SitDwnSeq1[5] = self.SitDwnSeq1[5+6] = 0 ######### NEW #########
-        self.SitDwnSeq1[6] = self.SitDwnSeq1[6+6] = -1.4
-        self.SitDwnSeq1[7] = self.SitDwnSeq1[7+6] = 2.4
-        self.SitDwnSeq1[8] = self.SitDwnSeq1[8+6] = -0.8
-        self.SitDwnSeq1[16] = self.SitDwnSeq1[16+6] = 1.2
-        self.SitDwnSeq1[17] = -0.75
-        self.SitDwnSeq1[17+6] = 0.75
-        self.SitDwnSeq1[18] = self.SitDwnSeq1[18+6] = 2.5
+        self.SitDwnSeq1[6] = self.SitDwnSeq1[6+6] = -1.2
+        self.SitDwnSeq1[7] = self.SitDwnSeq1[7+6] = 2.45
+        self.SitDwnSeq1[8] = self.SitDwnSeq1[8+6] = -0.2
+        self.SitDwnSeq1[16] = self.SitDwnSeq1[16+6] = 1.0
+        self.SitDwnSeq1[17] = -1.1
+        self.SitDwnSeq1[17+6] = 1.1
+        self.SitDwnSeq1[18] = self.SitDwnSeq1[18+6] = 2.2
         # self.SitDwnSeq1[21] = -0.1
         # self.SitDwnSeq1[21+6] = 0.1
-        self.SitDwnSeq1[21] = 0.2
-        self.SitDwnSeq1[21+6] = -0.2
-        self.SitDwnSeq1[19] = 0.6
-        self.SitDwnSeq1[19+6] = -0.6
+        self.SitDwnSeq1[19] = 0.1
+        self.SitDwnSeq1[19+6] = -0.1
+        self.SitDwnSeq1[20] = self.SitDwnSeq1[20+6] = 1.4
+        self.SitDwnSeq1[21] = 0.3
+        self.SitDwnSeq1[21+6] = -0.3
 
         self.SitDwnSeq2 = copy(self.SitDwnSeq1)
-        self.SitDwnSeq1[1] = 0.5
-        self.SitDwnSeq1[6] = self.SitDwnSeq1[6+6] = -1.6
-        self.SitDwnSeq1[17] = -0.55
-        self.SitDwnSeq1[17+6] = 0.55
+        self.SitDwnSeq2[1] = 0.5
+        self.SitDwnSeq2[6] = self.SitDwnSeq2[6+6] = -1.6
+        self.SitDwnSeq1[7] = self.SitDwnSeq1[7+6] = 2.0
         # self.SitDwnSeq2[19] = 0.6
         # self.SitDwnSeq2[19+6] = -0.6
-        self.SitDwnSeq1[21] = 0.2
-        self.SitDwnSeq1[21+6] = -0.2
+        self.SitDwnSeq2[20] = self.SitDwnSeq2[20+6] = 1.4
+        self.SitDwnSeq2[21] = 0.3
+        self.SitDwnSeq2[21+6] = -0.3
 
         ##################################################################
         ################# Crab Forward Walking Sequence ##################
@@ -98,20 +99,16 @@ class PW_seq():
         # Sequence Step 2: Extend legs
         ThisRobotCnfg = copy(self.RobotCnfg[0][:])
         ThisRobotCnfg[1] = 1.0
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.45
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75
         ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 1.1
         ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.4
-        ThisRobotCnfg[17] = -1.2
-        ThisRobotCnfg[17+6] = 1.2
-        ThisRobotCnfg[19] = 0.1
-        ThisRobotCnfg[19+6] = -0.1
         self.RobotCnfg.append(ThisRobotCnfg)
         self.StepDur.append(0.2*T)
 
         # Sequence Step 3: Put legs down, bringing torso forward and raising arms
         ThisRobotCnfg = copy(self.RobotCnfg[1][:])
-        # ThisRobotCnfg[1] = 0.3
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -0.8
+        ThisRobotCnfg[1] = 0.3
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75
         ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.1
         ThisRobotCnfg[17] = -0.3
         ThisRobotCnfg[17+6] = 0.3
@@ -126,7 +123,7 @@ class PW_seq():
         ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.6
         ThisRobotCnfg[17] = -1.35
         ThisRobotCnfg[17+6] = 1.35
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.4
         ThisRobotCnfg[19] = 0.1
         ThisRobotCnfg[19+6] = -0.1
         self.RobotCnfg.append(ThisRobotCnfg)
@@ -136,9 +133,9 @@ class PW_seq():
         ThisRobotCnfg = copy(self.RobotCnfg[3][:])
         ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.4
         ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = -0.2
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.0
-        ThisRobotCnfg[17] = -1.1
-        ThisRobotCnfg[17+6] = 1.1
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.1
+        ThisRobotCnfg[17] = -0.95
+        ThisRobotCnfg[17+6] = 0.95
         ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.5
         self.RobotCnfg.append(ThisRobotCnfg)
         self.StepDur.append(0.6*T)

@@ -1,0 +1,8 @@
+build/
+bin/
+msg_gen/
+srv_gen/
+_*
+*~
+*.pyc
+seqs.yaml
