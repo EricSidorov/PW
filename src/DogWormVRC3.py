@@ -15,13 +15,14 @@ roslib.load_manifest('PW')
 #import roslib; roslib.load_manifest('DogWorm')
 import math, rospy, os, rosparam
 import tf
+from seq_generator import PW_seq
 from sensor_msgs.msg import JointState
 from nav_msgs.msg import Odometry
 from numpy import zeros, array, linspace, arange
 import numpy as np
 from JointController import JointCommands_msg_handler
 from JointController import hand_joint_controller
-from robot_state import robot_state
+import robot_state
 from atlas_msgs.msg import AtlasState
 from math import ceil
 import yaml
@@ -48,7 +49,6 @@ class DW_Controller(object):
     def __init__(self,iTf):
         super(DW_Controller, self).__init__()
         self._iTf = iTf
-
         self.LoadPoses()
 
 
@@ -69,7 +69,7 @@ class DW_Controller(object):
         self.LHC = hand_joint_controller("left")
         self.RHC = hand_joint_controller("right")
         # Initialize robot state listener
-        self.RS = robot_state(self._jnt_names)
+        self.RS = robot_state.robot_state(self._jnt_names)
         self.IMU_mon = IMUCh()
 
         print("DW::Initialize")
@@ -273,206 +273,24 @@ class DW_Controller(object):
             print("SUCCESS!!\n")
                     
     def LoadPoses(self):
-        ##################################################################
-        ######################## GAIT PARAMETERS #########################
-        ##################################################################
-        self.CurSeqStep = 0
-        self.CurSeqStep2 = 0
-        self.Throtle = 1
-        self.RotFlag = 0
-        self.FollowPath = 0
-        self.DesOri = 0
-
-        self.count_tottal = 0
-        self.count_tipping = 0
-
-        self.BaseHipZ = 0.3
-        
-        ##################################################################
-        ###################### Basic Standing Pose #######################
-        ##################################################################
-
-        self.BasStndPose = zeros(28)
-        self.BasStndPose[5] = 0.1
-        self.BasStndPose[5+6] = -0.1
-        self.BasStndPose[6] = self.BasStndPose[6+6] = -0.2
-        self.BasStndPose[7] = self.BasStndPose[7+6] = 0.4
-        self.BasStndPose[8] = self.BasStndPose[8+6] = -0.2
-        self.BasStndPose[9] = -0.1
-        self.BasStndPose[9+6] = 0.1
-        self.BasStndPose[17] = -1.3
-        self.BasStndPose[17+6] = 1.3 
-        self.BasStndPose[18] = self.BasStndPose[18+6] = 1.5
-        #         # Pose[18] -= 1.5
-        #         # Pose[20] += 3.1
-        # # self.BasStndPose[18] = self.BasStndPose[18+6] = 0
-        # self.BasStndPose[20] = self.BasStndPose[20+6] = 1.5
-        self.BasStndPose[21] = 0.4
-        self.BasStndPose[27] = -0.4
-
-        self.BaseHandPose = zeros(12)
-        self.BaseHandPose[1] = self.BaseHandPose[1+3] = self.BaseHandPose[1+6] = 1.5
-
-
-        ##################################################################
-        ####################### Sit Down Sequence ########################
-        ##################################################################
-
-        self.SitDwnSeq1 = copy(self.BasStndPose)
-        self.SitDwnSeq1[1] = 0.1
-        self.SitDwnSeq1[5] = self.BaseHipZ#0.1 ######### NEW #########
-        self.SitDwnSeq1[5+6] = -self.BaseHipZ#-0.1 ######### NEW #########
-        # self.SitDwnSeq1[5] = self.SitDwnSeq1[5+6] = 0 ######### NEW #########
-        self.SitDwnSeq1[6] = self.SitDwnSeq1[6+6] = -1.4
-        self.SitDwnSeq1[7] = self.SitDwnSeq1[7+6] = 2.4
-        self.SitDwnSeq1[8] = self.SitDwnSeq1[8+6] = -0.8
-        self.SitDwnSeq1[16] = self.SitDwnSeq1[16+6] = 1.2
-        self.SitDwnSeq1[17] = -0.95
-        self.SitDwnSeq1[17+6] = 0.95
-        self.SitDwnSeq1[18] = self.SitDwnSeq1[18+6] = 2.5
-        self.SitDwnSeq1[21] = 0.2
-        self.SitDwnSeq1[21+6] = -0.2
-
-        ##################################################################
-        ################# Crab Forward Walking Sequence ##################
-        ##################################################################
-
-        T = 1.5
-        self.RobotCnfg = []
-        self.StepDur = []
-
-        # Sequence Step 1: Touch ground with pelvis, lift legs
-        ThisRobotCnfg = copy(self.SitDwnSeq1)
-        ThisRobotCnfg[1] = 0.9
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = -0.1
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.9
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.1*T)
-        
-        # Sequence Step 2: Extend legs
-        ThisRobotCnfg = copy(self.RobotCnfg[0][:])
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 1.1
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.8
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.2*T)
-
-        # Sequence Step 3: Put legs down, bringing torso forward and raising arms
-        ThisRobotCnfg = copy(self.RobotCnfg[1][:])
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.4
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.1
-        ThisRobotCnfg[17] = -1.
-        ThisRobotCnfg[17+6] = 1.
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.3
-        ThisRobotCnfg[19] = 2
-        ThisRobotCnfg[19+6] = -2
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.6*T)
-
-        # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
-        ThisRobotCnfg = copy(self.RobotCnfg[2][:])
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.6
-        ThisRobotCnfg[17] = -1.35
-        ThisRobotCnfg[17+6] = 1.35
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2
-        ThisRobotCnfg[19] = 0.1
-        ThisRobotCnfg[19+6] = -0.1
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.4*T)
-
-        # Sequence Step 5: Bring pelvis forward, closer to legs
-        ThisRobotCnfg = copy(self.RobotCnfg[3][:])
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.4
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = -0.2
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.0
-        ThisRobotCnfg[17] = -1.1
-        ThisRobotCnfg[17+6] = 1.1
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.5
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.6*T)
-
-        ##################################################################
-        ################# Crab Backward Walking Sequence #################
-        ##################################################################
-
-        T = 1
-        self.RobotCnfg2 = []
-        self.StepDur2 = []
-
-        # Sequence Step 1: Bring pelvis down to the ground and lift arms
-        ThisRobotCnfg = copy(self.SitDwnSeq1)
-        ThisRobotCnfg[1] = 0.5
-        ThisRobotCnfg[4] = self.BaseHipZ
-        ThisRobotCnfg[4+6] = -self.BaseHipZ
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.7
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 1.0
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.8
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.5
-        ThisRobotCnfg[17] = -0.2#-0.6
-        ThisRobotCnfg[17+6] = 0.2#0.6
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.5
-        ThisRobotCnfg[19] = 1.8
-        ThisRobotCnfg[19+6] = -1.8
-        ThisRobotCnfg[21] = -0.5
-        ThisRobotCnfg[21+6] = 0.5
-        self.RobotCnfg2.append(ThisRobotCnfg)
-        self.StepDur2.append(0.3*T)
-
-        # Sequence Step 2: Extend arms
-        ThisRobotCnfg = copy(self.RobotCnfg2[0][:])
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.2#1.4
-        ThisRobotCnfg[17] = -0.4#-0.4#-0.2#-0.6#-0.4
-        ThisRobotCnfg[17+6] = 0.4#0.4#0.2#0.6# 0.4
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.9
-        ThisRobotCnfg[19] = 0.2
-        ThisRobotCnfg[19+6] = -0.2
-        ThisRobotCnfg[21] = 0
-        ThisRobotCnfg[21+6] = 0
-        self.RobotCnfg2.append(ThisRobotCnfg)
-        self.StepDur2.append(0.3*T)
-
-        # Sequence Step 3: Extend torso, fall back on arms, lift and fold legs
-        ThisRobotCnfg = copy(self.RobotCnfg2[1][:])
-        ThisRobotCnfg[1] = 0.6
-        ThisRobotCnfg[4] = ThisRobotCnfg[4+6] = 0
-        ThisRobotCnfg[5] = self.BaseHipZ
-        ThisRobotCnfg[5+6] = -self.BaseHipZ
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.8
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.6
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.2
-        ThisRobotCnfg[17] = -0.6#-0.4#-0.2#-0.6#-0.4
-        ThisRobotCnfg[17+6] = 0.6#0.4#0.2#0.6# 0.4
-        self.RobotCnfg2.append(ThisRobotCnfg)
-        self.StepDur2.append(0.4*T)
-
-        # Sequence Step 4: Place legs on ground and lift pelvis
-        ThisRobotCnfg = copy(self.RobotCnfg2[2][:])
-        ThisRobotCnfg[1] = 0.3
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -0.6
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.0
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.8
-        ThisRobotCnfg[19] = 0.4
-        ThisRobotCnfg[19+6] = -0.4
-        self.RobotCnfg2.append(ThisRobotCnfg)
-        self.StepDur2.append(0.4*T)
-
-        # Sequence Step 5: Move pelvis back, between arms
-        ThisRobotCnfg = copy(self.RobotCnfg2[3][:])
-        ThisRobotCnfg[1] = 0.5
-        ThisRobotCnfg[4] = self.BaseHipZ
-        ThisRobotCnfg[4+6] = -self.BaseHipZ
-        ThisRobotCnfg[5] = ThisRobotCnfg[5+6] = 0
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.7
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 1.0
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.8
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.5
-        ThisRobotCnfg[17] = -1.35
-        ThisRobotCnfg[17+6] = 1.35
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.3
-        ThisRobotCnfg[19] = 0.5
-        ThisRobotCnfg[19+6] = -0.5
-        self.RobotCnfg2.append(ThisRobotCnfg)
-        self.StepDur2.append(1*T)#was 0.7*T
+        execfile("seq_generator.py")
+        seq_file = file('seqs.yaml','r')
+        seqs = yaml.load(seq_file)
+        self.BasStndPose = seqs.BasStndPose
+        self.SitDwnSeq1 = seqs.SitDwnSeq1
+        self.RobotCnfg = seqs.RobotCnfg
+        self.RobotCnfg2 = seqs.RobotCnfg2
+        self.BaseHandPose = seqs.BaseHandPose
+        self.StepDur = seqs.StepDur
+        self.StepDur2 = seqs.StepDur2
+        self.Throtle = seqs.Throtle
+        self.count_tipping = seqs.count_tipping
+        self.count_tottal = seqs.count_tottal
+        self.BaseHipZ = seqs.BaseHipZ
+        self.CurSeqStep = seqs.CurSeqStep
+        self.CurSeqStep2 = seqs.CurSeqStep2
+        self.DesOri = seqs.DesOri
+        self.FollowPath = seqs.FollowPath
 
     def RS_cb(self,msg):
         self.RS.UpdateState(msg)
