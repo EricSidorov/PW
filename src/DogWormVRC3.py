@@ -14,15 +14,15 @@ import roslib
 roslib.load_manifest('PW')
 #import roslib; roslib.load_manifest('DogWorm')
 import math, rospy, os, rosparam
-import tf
 from seq_generator import PW_seq
+import tf
 from sensor_msgs.msg import JointState
 from nav_msgs.msg import Odometry
 from numpy import zeros, array, linspace, arange
 import numpy as np
 from JointController import JointCommands_msg_handler
 from JointController import hand_joint_controller
-import robot_state
+from robot_state import robot_state
 from PW.msg import Status
 from atlas_msgs.msg import AtlasState
 from math import ceil
@@ -50,6 +50,7 @@ class DW_Controller(object):
     def __init__(self,iTf):
         super(DW_Controller, self).__init__()
         self._iTf = iTf
+
         self.LoadPoses()
 
 
@@ -70,10 +71,10 @@ class DW_Controller(object):
         self.LHC = hand_joint_controller("left")
         self.RHC = hand_joint_controller("right")
         # Initialize robot state listener
-        self.RS = robot_state.robot_state(self._jnt_names)
+        self.RS = robot_state(self._jnt_names)
         self.IMU_mon = IMUCh()
 
-        print("DW::Initialize")
+        print("PW::Initialize")
         self.GlobalPos = 0
         self.GlobalOri = 0
         self._counter = 0
@@ -182,6 +183,12 @@ class DW_Controller(object):
                 Parameters.append(Sequence)
                 Parameters.append(SeqStep)
 
+            String = 'quit'
+            if Command.find(String) == 0:
+                Quit = 1
+            else:
+                Quit = 0
+
             String = 'terrain'
             if Command.find(String) == 0:
                 CommParted = Command.partition(String+" ")
@@ -205,6 +212,8 @@ class DW_Controller(object):
         else:
             self._stat_pub.publish(Status("Busy"))
             self.DoTask(Parameters)
+            if Quit == 1:
+                rospy.signal_shutdown("Received QUIT command")
 
 
     def DoTask(self, Parameters):
@@ -282,6 +291,7 @@ class DW_Controller(object):
         seqs = yaml.load(seq_file)
         self.BasStndPose = seqs.BasStndPose
         self.SitDwnSeq1 = seqs.SitDwnSeq1
+        self.SitDwnSeq2 = seqs.SitDwnSeq2
         self.RobotCnfg = seqs.RobotCnfg
         self.RobotCnfg2 = seqs.RobotCnfg2
         self.BaseHandPose = seqs.BaseHandPose
@@ -385,34 +395,13 @@ class DW_Controller(object):
         else:
             print 'position command legth doest fit'
 
-    # def TimeVariantIterp(self,pos1,pos2,T_nom,dt_nom,vel_ind):
-    #     if len(pos1) == len(pos2) == len(self._jnt_names):
-    #         N = ceil(T_nom/dt_nom)
-    #         pos1 = array(pos1)
-    #         pos2 = array(pos2)
-    #         K =100
-    #         for ratio in linspace(0, 1, N):
-    #             interpCommand = (1-ratio)*pos1 + ratio * pos2
-    #             if np.linalg.norm(interpCommand - pos2) <= 0.01:
-    #                 return
-    #             self.JC.set_all_pos([ float(x) for x in interpCommand ])
-    #             self.JC.send_command()
-    #             vel = self.RS.GetAngVel()
-    #             dt = max(dt_nom/(K*vel[vel_ind]),dt_nom/100)
-    #             rospy.sleep(dt)
-
-    #     else:
-    #         print 'position command legth doest fit'
-
     def Sit(self,T):
         self.JC.set_gains("l_arm_mwx",20,0,15)
         self.JC.set_gains("r_arm_mwx",20,0,15)
         self.JC.set_gains("l_arm_elx",50,0,15)
         self.JC.set_gains("r_arm_elx",50,0,15)
         pos = copy(self.SitDwnSeq1)
-        pos[21] = 0.4
-        pos[21+6] = -0.4
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,T*0.3,0.005)
+        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,T*0.5,0.005)
         # self.SeqWithBalance(self.RS.GetJointPos(),self.SitDwnSeq1,T*0.3,0.005)
         self.JC.set_pos("l_leg_uay",-0.1)
         self.JC.set_pos("r_leg_uay",-0.1)
@@ -427,11 +416,11 @@ class DW_Controller(object):
         self.JC.set_gains("r_arm_elx",200,0,3)
         self.JC.set_gains("l_arm_mwx",100,0,0.2)
         self.JC.set_gains("r_arm_mwx",100,0,0.2)
-        self.JC.set_gains("l_leg_uay",50,0,5,set_default = False)
-        self.JC.set_gains("r_leg_uay",50,0,5,set_default = False)
-        self.JC.set_gains("l_leg_lax",50,0,5,set_default = False)
-        self.JC.set_gains("r_leg_lax",50,0,5,set_default = False)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq1,T*0.3,0.005)
+        # self.JC.set_gains("l_leg_uay",50,0,5,set_default = False)
+        # self.JC.set_gains("r_leg_uay",50,0,5,set_default = False)
+        # self.JC.set_gains("l_leg_lax",50,0,5,set_default = False)
+        # self.JC.set_gains("r_leg_lax",50,0,5,set_default = False)
+        self.JC.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq2,T*0.2,0.005)
         # self.JC.send_command()
         # rospy.sleep(T*0.2)
 
@@ -926,7 +915,8 @@ class DW_Controller(object):
             
             y,p,r = self.current_ypr()
             self._fall_count += 1
-            R,P,Y = self.RS.GetIMU()
+            # R,P,Y = self.RS.GetIMU()
+            R,P,Y = self.RS._orientation.GetRPY()
 
             print 'Check Tipping r=',r,"R=",R,"p=",p,"P=",P
             # if abs(p)>0.4*math.pi or abs(r)>0.8*math.pi:
