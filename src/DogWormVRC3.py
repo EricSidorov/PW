@@ -23,6 +23,7 @@ import numpy as np
 from JointController import JointCommands_msg_handler
 from JointController import hand_joint_controller
 from robot_state import robot_state
+from PW.msg import Status
 from atlas_msgs.msg import AtlasState
 from math import ceil
 import yaml
@@ -81,6 +82,7 @@ class DW_Controller(object):
         self._fall_count = 0
         self.FALL_LIMIT = 3
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
+        self._stat_pub = rospy.Publisher('/PW/status',Status)
 
         ##################################################################
         ######################## Controller Gains ########################
@@ -208,6 +210,7 @@ class DW_Controller(object):
         if MotionType == 0:
             print("Got no command param, aborting...")
         else:
+            self._stat_pub.publish(Status("Busy"))
             self.DoTask(Parameters)
             if Quit == 1:
                 rospy.signal_shutdown("Received QUIT command")
@@ -280,6 +283,7 @@ class DW_Controller(object):
             if Sequence.find("bwd") == 0:
                 self.GoToBackSeqStep(SeqStep)
             print("SUCCESS!!\n")
+        self._stat_pub.publish(Status("Free"))
                     
     def LoadPoses(self):
         execfile("seq_generator.py")

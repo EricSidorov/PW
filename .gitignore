@@ -1,8 +1,10 @@
+
+#ROS auto-make files
 build/
 bin/
 msg_gen/
 srv_gen/
-_*
-*~
+src/PW
+*__.py
 *.pyc
 seqs.yaml
