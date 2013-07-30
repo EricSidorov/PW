@@ -8,22 +8,18 @@ def stat_cb(msg):
 	global busy
 	if msg.status == "Busy":
 		busy = True
+		print 'Status: ', msg.status
 	if msg.status == "Free":
 		busy = False
-	print 'Status: ', msg.status	
+		print 'Status: ', msg.status, '\n'
+		comm = raw_input('enter command: ')
+		pub.publish(String(comm))
+
 stat_sub = rospy.Subscriber('/PW/status',Status,stat_cb)
 pub = rospy.Publisher('/DW_control',String)
-def main():
-	global busy
-	comm = raw_input('enter command: ')
-	if not busy:
-		pub.publish(String(comm))
-	else:
-		print "busy..."
+
 if __name__ == '__main__':
-	while True:
-		try:
-			main()
-		except KeyboardInterrupt:
-			print 'bye'
-			break
+	comm = raw_input('enter command: ')
+	pub.publish(String(comm))
+
+	rospy.spin()

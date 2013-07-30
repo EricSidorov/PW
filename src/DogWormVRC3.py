@@ -207,13 +207,16 @@ class DW_Controller(object):
                 print CommParted[2]
                 self.DesOri = float(CommParted[2])
 
+        if Quit == 1:
+            self._stat_pub.publish(Status("Free"))
+            rospy.signal_shutdown("Received QUIT command")
+            exit()
+            
         if MotionType == 0:
             print("Got no command param, aborting...")
         else:
             self._stat_pub.publish(Status("Busy"))
             self.DoTask(Parameters)
-            if Quit == 1:
-                rospy.signal_shutdown("Received QUIT command")
 
 
     def DoTask(self, Parameters):
@@ -229,14 +232,14 @@ class DW_Controller(object):
         elif MotionType == 2: ################ FWD ################
             NumSteps = Parameters[1]
             print("Crawling FWD %d steps..." % NumSteps)
-            for x in range(1,NumSteps):
+            for x in range(NumSteps):
                 self.Crawl()
             print("SUCCESS!!\n")
 
         elif MotionType == 3: ################ BWD ################
             NumSteps = Parameters[1]
             print("Crawling BWD %d steps..." % NumSteps)
-            for x in range(1,NumSteps):
+            for x in range(NumSteps):
                 self.BackCrawl()
             print("SUCCESS!!\n")
 

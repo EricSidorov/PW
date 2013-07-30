@@ -203,7 +203,7 @@ class PW_seq():
 
         # Sequence Step 4: Place legs on ground and lift pelvis
         ThisRobotCnfg = copy(self.RobotCnfg2[2][:])
-        ThisRobotCnfg[1] = 0.4
+        ThisRobotCnfg[1] = 0.5
         ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -0.6
         ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.0
         ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0
