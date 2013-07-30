@@ -289,6 +289,7 @@ class DW_Controller(object):
         execfile("seq_generator.py")
         seq_file = file('seqs.yaml','r')
         seqs = yaml.load(seq_file)
+        self.RotFlag = seqs.RotFlag
         self.BasStndPose = seqs.BasStndPose
         self.SitDwnSeq1 = seqs.SitDwnSeq1
         self.SitDwnSeq2 = seqs.SitDwnSeq2
@@ -1233,7 +1234,16 @@ if __name__=='__main__':
     DW.RHC.send_command()
     rospy.sleep(0.5)
 
-    rospy.spin()
+    while True:
+        try:
+            comm = raw_input("Enter command:")
+        except KeyboardInterrupt:
+                print "Quitter..."
+                break
+        if comm == "Exit" or comm == "exit":
+            break
+        DW.Interface_cb(String(comm))
+    # rospy.spin()
 
     # DW.Sit(1.5)       
     # rospy.sleep(0.5)
