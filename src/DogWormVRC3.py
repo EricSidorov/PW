@@ -183,6 +183,11 @@ class DW_Controller(object):
                 Parameters.append(Sequence)
                 Parameters.append(SeqStep)
 
+            String = 'close hands'
+            if Command.find(String) == 0:
+                MotionType = 10
+                Parameters.append(MotionType)
+
             String = 'quit'
             if Command.find(String) == 0:
                 Quit = 1
@@ -200,6 +205,9 @@ class DW_Controller(object):
             if Command.find(String) == 0:
                 CommParted = Command.partition(String+" ")
                 self.FollowPath = int(CommParted[2])
+                if self.FollowPath == 0:
+                    self.AddRotation(0)
+                    self.AddBackRotation(0)
 
             String = 'bedes'
             if Command.find(String) == 0:
@@ -286,6 +294,12 @@ class DW_Controller(object):
             if Sequence.find("bwd") == 0:
                 self.GoToBackSeqStep(SeqStep)
             print("SUCCESS!!\n")
+
+        elif MotionType == 10: ############# CLOSE HANDS ##############
+            print("Closing hands...")
+            self.CloseHands()
+            print("SUCCESS!!\n")
+
         self._stat_pub.publish(Status("Free"))
                     
     def LoadPoses(self):
@@ -425,6 +439,8 @@ class DW_Controller(object):
         # self.JC.set_gains("l_leg_lax",50,0,5,set_default = False)
         # self.JC.set_gains("r_leg_lax",50,0,5,set_default = False)
         self.JC.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq2,T*0.2,0.005)
+        self.JC.set_gains("l_arm_mwx",400,0,10)
+        self.JC.set_gains("r_arm_mwx",400,0,10)
         # self.JC.send_command()
         # rospy.sleep(T*0.2)
 
@@ -533,15 +549,17 @@ class DW_Controller(object):
         if self.FollowPath == 1:
             # Update sequence to correct orientation
             y,p,r = self.current_ypr()
+            print("Bearing: %f" % y)
             Correction = self.DeltaAngle(self.DesOri,y)
+            print("Bearing: %f, DesOri: %f, Coorection = %f" % (y,self.DesOri,Correction))
 
-            Delta = Correction/0.15
+            Delta = Correction/0.4
             if abs(Delta)>1:
                 Delta /= abs(Delta)
 
             self.AddRotation(Delta)
 
-        self.GoToSeqStep(5)
+        self.GoToSeqStep(len(self.StepDur))
         self.RotFlag = 0
 
     def BackCrawl(self):
@@ -564,13 +582,13 @@ class DW_Controller(object):
             self.RotFlag = 2
             self.GoToBackSeqStep(1)
 
-        self.GoToBackSeqStep(5)
+        self.GoToBackSeqStep(len(self.StepDur2))
 
     def GoToSeqStep(self,Step):
         if Step == self.CurSeqStep:
             pass
         else:
-            if Step > 4:
+            if Step > len(self.StepDur)-1:
                 Step = 0
                 self.DoSeqStep()
             while self.CurSeqStep != Step:
@@ -580,7 +598,7 @@ class DW_Controller(object):
         if Step == self.CurSeqStep2:
             pass
         else:
-            if Step > 4:
+            if Step > len(self.StepDur2)-1:
                 Step = 0
                 self.DoInvSeqStep()
             while self.CurSeqStep2 != Step:
@@ -594,7 +612,7 @@ class DW_Controller(object):
         self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throtle,0.005) 
         self.JC.reset_gains()
         self.CurSeqStep += 1
-        if self.CurSeqStep > 4:
+        if self.CurSeqStep > len(self.StepDur)-1:
             self.CurSeqStep = 0
     
     def DoInvSeqStep(self):
@@ -633,31 +651,33 @@ class DW_Controller(object):
         self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[self.CurSeqStep2],self.StepDur2[self.CurSeqStep2]/self.Throtle,0.005) 
         self.JC.reset_gains()
         self.CurSeqStep2 += 1
-        if self.CurSeqStep2 > 4:
+        if self.CurSeqStep2 > len(self.StepDur2)-1:
             self.CurSeqStep2 = 0
         # if self.CurSeqStep2 > 4:
         #     self.CurSeqStep2 = 0
 
     def AddRotation(self,Delta):
-        # Delta of 1 gives approx. 0.15 radians turn left
+        # Delta of 1 gives approx. 0.4 radians turn right
         # Add gait changes to appropriate step
-        self.RobotCnfg[1][4] = self.BaseHipZ+Delta*0.2
-        self.RobotCnfg[1][4+6] = -self.BaseHipZ+Delta*0.2
-        self.RobotCnfg[1][9] = self.RobotCnfg[1][9+6] = Delta*0.12
-        self.RobotCnfg[4][4] = self.BaseHipZ
-        self.RobotCnfg[4][4+6] = -self.BaseHipZ
-        self.RobotCnfg[4][9] = self.RobotCnfg[4][9+6] = 0
+        # self.RobotCnfg[2][2] = -Delta*0.15
+        # self.RobotCnfg[2][0] = Delta*0.1
+        # self.RobotCnfg[2][4] = self.BaseHipZ+Delta*0.1
+        # self.RobotCnfg[2][4+6] = -self.BaseHipZ+Delta*0.1
+        # self.RobotCnfg[2][5] = self.BaseHipZ+Delta*0.2
+        # self.RobotCnfg[2][5+6] = -self.BaseHipZ+Delta*0.2
 
-        # Insert those changes in following steps as well
-        self.RobotCnfg[2][4] = self.BaseHipZ+Delta*0.2
-        self.RobotCnfg[2][4+6] = -self.BaseHipZ+Delta*0.2
-        self.RobotCnfg[2][9] = self.RobotCnfg[2][9+6] = Delta*0.12
-        self.RobotCnfg[3][4] = self.BaseHipZ+Delta*0.2
-        self.RobotCnfg[3][4+6] = -self.BaseHipZ+Delta*0.2
-        self.RobotCnfg[3][9] = self.RobotCnfg[3][9+6] = Delta*0.12
-        self.RobotCnfg[0][4] = self.BaseHipZ
-        self.RobotCnfg[0][4+6] = -self.BaseHipZ
-        self.RobotCnfg[0][9] = self.RobotCnfg[0][9+6] = 0
+        # # Insert those changes in following steps as well
+        # self.RobotCnfg[3][0] = Delta*0.1
+        # self.RobotCnfg[3][4] = self.BaseHipZ+Delta*0.1
+        # self.RobotCnfg[3][4+6] = -self.BaseHipZ+Delta*0.1
+        # self.RobotCnfg[3][5] = self.BaseHipZ+Delta*0.2
+        # self.RobotCnfg[3][5+6] = -self.BaseHipZ+Delta*0.2
+        # self.RobotCnfg[4][4] = self.BaseHipZ+Delta*0.1
+        # self.RobotCnfg[4][4+6] = -self.BaseHipZ+Delta*0.1
+        # self.RobotCnfg[4][5] = self.BaseHipZ+Delta*0.2
+        # self.RobotCnfg[4][5+6] = -self.BaseHipZ+Delta*0.2
+        pass
+
 
     def AddBackRotation(self,Delta):
         # Delta of 1 gives approx. 0.22 radians turn left
@@ -1212,6 +1232,12 @@ class DW_Controller(object):
             D, R = self._iTf.TransformListener().lookupTransform('/l_foot','/pelvis',rospy.Time(0))
             print 'roll: ',RPY[0],'pitch: ',RPY[1],'D: ',D[2]
 
+    def CloseHands(self):
+        self.LHC.set_all_pos(self.BaseHandPose)
+        self.RHC.set_all_pos(self.BaseHandPose)
+        self.LHC.send_command()
+        self.RHC.send_command()
+
 
 ##################################################################
 ######################### USAGE EXAMPLE ##########################
@@ -1231,15 +1257,13 @@ if __name__=='__main__':
 
     #self._Subscribers["Odometry"] = rospy.Subscriber('/ground_truth_odom',Odometry,self._Controller.Odom_cb)
     rospy.Subscriber('/atlas/atlas_state',AtlasState,DW.RS_cb)
-    DW.LHC.set_all_pos(DW.BaseHandPose)
-    DW.RHC.set_all_pos(DW.BaseHandPose)
-    DW.LHC.send_command()
-    DW.RHC.send_command()
-    rospy.sleep(0.5)
+    DW.CloseHands()
+    rospy.sleep(0.1)
+    DW.CloseHands()
 
     while True:
         try:
-            comm = raw_input("Enter command:")
+            comm = raw_input("Enter command: ")
         except KeyboardInterrupt:
                 print "Quitter..."
                 break
