@@ -34,6 +34,7 @@ from IMU_monitoring import IMUCh
 # from Abstractions.Interface_tf import *
 from std_msgs.msg import String
 
+
 class Interface_tf(object):
     def __init__(self):
         self._TransformListener = tf.TransformListener()
@@ -44,6 +45,7 @@ class Interface_tf(object):
     
     def TransformBroadcaster(self):
         return self._TransformBroadcaster
+
 
 class DW_Controller(object):
     """DW_Controller"""
@@ -77,8 +79,10 @@ class DW_Controller(object):
         print("PW::Initialize")
         self.GlobalPos = 0
         self.GlobalOri = 0
+        self.HeadPitch = 0
         self._counter = 0
         self._terrain = Terrain
+        self.RotMode = 2
         self._fall_count = 0
         self.FALL_LIMIT = 3
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
@@ -92,6 +96,10 @@ class DW_Controller(object):
         self.JC.set_gains('r_leg_uhz',1000,0,10)
         self.JC.set_gains('l_leg_mhx',1000,0,10)
         self.JC.set_gains('r_leg_mhx',1000,0,10)
+        # self.JC.set_gains('l_leg_kny',100,0,10)
+        # self.JC.set_gains('r_leg_kny',100,0,10)
+        # self.JC.set_gains('l_leg_lhy',100,0,10)
+        # self.JC.set_gains('r_leg_lhy',100,0,10)
         self.JC.set_gains('back_lbz',5000,0,10)
         self.JC.set_gains('back_ubx',2000,0,10)
         self.JC.set_gains('l_arm_usy',1000,0,10)
@@ -152,29 +160,50 @@ class DW_Controller(object):
                 Bearing = float(CommParted[2])
                 Parameters.append(Bearing)
 
-            String = 'recover'
+            String = 'rot'
             if Command.find(String) == 0:
-                MotionType = 5
-                Parameters.append(MotionType)
+                CommParted = Command.partition(String+" ")
+                if CommParted[2].find("type") == 0:
+                    CommParted2 = CommParted[2].partition(" ")
+                    if CommParted2[2].find("fast") == 0:
+                        self.RotMode = 1
+                        print "Rotation mode set to fast"
+                    if CommParted2[2].find("slow") == 0:
+                        self.RotMode = 2
+                        print "Rotation mode set to slow"
+                    MotionType = -1
+                else:
+                    MotionType = 5
+                    Delta = float(CommParted[2])
+                    Parameters.append(MotionType)
+                    Parameters.append(Delta)
 
-            String = 'standup'
+            String = 'recover'
             if Command.find(String) == 0:
                 MotionType = 6
                 Parameters.append(MotionType)
 
-            String = 'reset'
+            String = 'standup'
             if Command.find(String) == 0:
                 MotionType = 7
                 Parameters.append(MotionType)
 
+            String = 'reset'
+            if Command.find(String) == 0:
+                if Command.find("pose") > 0:
+                    MotionType = 8
+                else:
+                    MotionType = 9
+                Parameters.append(MotionType)
+
             String = 'reload'
             if Command.find(String) == 0:
-                MotionType = 8
+                MotionType = 10
                 Parameters.append(MotionType)
 
             String = 'seq'
             if Command.find(String) == 0:
-                MotionType = 9
+                MotionType = 11
                 Parameters.append(MotionType)
                 CommParted = Command.partition(String+" ")
                 CommParted2 = CommParted[2].partition(" ")
@@ -185,35 +214,66 @@ class DW_Controller(object):
 
             String = 'close hands'
             if Command.find(String) == 0:
-                MotionType = 10
+                MotionType = 12
                 Parameters.append(MotionType)
 
             String = 'quit'
             if Command.find(String) == 0:
+                MotionType = -1
                 Quit = 1
             else:
                 Quit = 0
 
+            String = 'status'
+            if Command.find(String) == 0:
+                MotionType = -1
+                if self.FollowPath == 0:
+                    print "Bearing feedback is now OFF"
+                else:
+                    print "Bearing feedback is now ON"
+                    print("Desired bearing set to: %f" % self.DesOri)
+                print("Terrain type set to: %s" % self._terrain)
+                if self.RotMode == 1:
+                    print "Rotation mode set to fast"
+                else:
+                    print "Rotation mode set to slow"
+
             String = 'terrain'
             if Command.find(String) == 0:
+                MotionType = -1
                 CommParted = Command.partition(String+" ")
                 self._terrain = CommParted[2]
-            else:
-                self._terrain = "MUD"
+                print("Terrain type set to: %s" % self._terrain)
 
             String = 'befb'
             if Command.find(String) == 0:
+                MotionType = -1
                 CommParted = Command.partition(String+" ")
                 self.FollowPath = int(CommParted[2])
                 if self.FollowPath == 0:
                     self.AddRotation(0)
                     self.AddBackRotation(0)
+                    print "Bearing feedback is now OFF"
+                else:
+                    print "Bearing feedback is now ON"
 
             String = 'bedes'
             if Command.find(String) == 0:
+                MotionType = -1
                 CommParted = Command.partition(String+" ")
-                print CommParted[2]
                 self.DesOri = float(CommParted[2])
+                print("Desired bearing set to: %f" % self.DesOri)
+
+            String = 'head'
+            if Command.find(String) == 0:
+                MotionType = -1
+                CommParted = Command.partition(String+" ")
+                CommParted2 = CommParted[2].partition(" ")
+                if CommParted2[0].find("up"):
+                    self.HeadPitch = self.HeadPitch + float(CommParted2[2])
+                if CommParted2[0].find("down"):
+                    self.HeadPitch = self.HeadPitch - float(CommParted2[2])
+                self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1],0.5,0.005)
 
         if Quit == 1:
             self._stat_pub.publish(Status("Free"))
@@ -222,6 +282,8 @@ class DW_Controller(object):
             
         if MotionType == 0:
             print("Got no command param, aborting...")
+        elif MotionType < 0:
+            print " "
         else:
             self._stat_pub.publish(Status("Busy"))
             self.DoTask(Parameters)
@@ -259,33 +321,56 @@ class DW_Controller(object):
             else:
                 print("FAIL\n")
 
-        elif MotionType == 5: ################ RECOVER ################
+        elif MotionType == 5: ########### SINGLE ROTATE ############
+            Delta = Parameters[1]
+            if self.RotMode == 1:
+                print("Rotating fast in place %0.0f%%" % (Delta*100))
+                y0,p,r = self.current_ypr()
+                self.RotSpotSeq(Delta)
+                y,p,r = self.current_ypr()
+                print("Rotated %f radians" % (self.DeltaAngle(y,y0)))                
+            else:
+                print("Rotating slowly in place %0.0f%%" % (Delta*100))
+                y0,p,r = self.current_ypr()
+                self.RotOnMudSeq(Delta)
+                y,p,r = self.current_ypr()
+                print("Rotated %f radians" % (self.DeltaAngle(y,y0)))    
+            print("SUCCESS!!\n")
+
+        elif MotionType == 6: ################ RECOVER ################
             print("Recovering after tipping...")
             if self.CheckTipping():
                 print("SUCCESS!!\n")
             else:
                 print("FAIL\n")
 
-        elif MotionType == 6: ################ STANDUP ################
+        elif MotionType == 7: ################ STANDUP ################
             print("Standing up...")
             self.StandUp()
             print("SUCCESS!!\n")
 
-        elif MotionType == 7: ################ RESET ################
+        elif MotionType == 8: ################ RESET (POSE) ################
             print("Resetting...")
             self.LoadPoses()
             self.JC.reset_gains()
-            self.JC.send_pos_traj(self.RS.GetJointPos(),self.BasStndPose,0.5,0.005)
+            self.send_pos_traj(self.RS.GetJointPos(),self.BasStndPose,0.5,0.005)
+            print("SUCCESS!!\n")
+
+        elif MotionType == 9: ################ RESET (FULL) ################
+            print("Resetting...")
+            self.LoadPoses()
+            self.JC.reset_gains()
+            self.send_pos_traj(self.RS.GetJointPos(),self.BasStndPose,0.5,0.005)
             rospy.sleep(0.5)
             self.reset()
             print("SUCCESS!!\n")
 
-        elif MotionType == 8: ################ RELOAD ################
+        elif MotionType == 10: ################ RELOAD ################
             print("Loading new gaits...")
             self.LoadPoses()
             print("SUCCESS!!\n")
 
-        elif MotionType == 9: ################ SEQUENCE ################
+        elif MotionType == 11: ################ SEQUENCE ################
             Sequence = Parameters[1]
             SeqStep = Parameters[2]
             print("Going to %s sequence step %d" % (Sequence, SeqStep))
@@ -295,13 +380,18 @@ class DW_Controller(object):
                 self.GoToBackSeqStep(SeqStep)
             print("SUCCESS!!\n")
 
-        elif MotionType == 10: ############# CLOSE HANDS ##############
+        elif MotionType == 12: ############# CLOSE HANDS ##############
             print("Closing hands...")
             self.CloseHands()
             print("SUCCESS!!\n")
 
         self._stat_pub.publish(Status("Free"))
-                    
+               
+    def send_pos_traj(self,pos0,pos1,T,dT):
+        pos1[3] = self.HeadPitch
+        self.JC.send_pos_traj(pos0,pos1,T,dT)
+
+
     def LoadPoses(self):
         execfile("seq_generator.py")
         seq_file = file('seqs.yaml','r')
@@ -324,10 +414,12 @@ class DW_Controller(object):
         self.DesOri = seqs.DesOri
         self.FollowPath = seqs.FollowPath
 
+
     def RS_cb(self,msg):
         self.RS.UpdateState(msg)
         self.IMU_mon.get_contact(msg)
         self.IMU_mon.imu_manipulate(msg)
+
 
     def Odom_cb(self,msg):
         if 1000 <= self._counter: 
@@ -338,6 +430,7 @@ class DW_Controller(object):
         # self.GlobalOri = msg.pose.pose.pose.orientation # from C25_GlobalPosition
         self.GlobalPos = msg.pose.pose.position    # from /ground_truth_odom
         self.GlobalOri = msg.pose.pose.orientation # from /ground_truth_odom
+
 
     def move_neck(self):
         init_pos = self.RS.GetJointPos()
@@ -352,9 +445,11 @@ class DW_Controller(object):
             self.JC.send_command()
             rospy.sleep(dt)
 
+
     def ResetPose(self):
         self.JC.set_all_pos([0]*28)
         self.JC.send_command()
+
 
     def reset(self):
         self.reset_srv()
@@ -365,12 +460,14 @@ class DW_Controller(object):
             self.reset_srv()
             rospy.sleep(1)
 
+
     def current_ypr(self):
         quat = copy(self.GlobalOri)
         (r, p, y) = tf.transformations.euler_from_quaternion([quat.x, quat.y, quat.z, quat.w])
         return (y,p,r)
         # RPY = self.RS.GetIMU()
         # return (RPY[2], RPY[1], RPY[0])
+
 
     def DeltaAngle(self,DesAngle,CurAngle):
         Delta = DesAngle - CurAngle
@@ -379,6 +476,7 @@ class DW_Controller(object):
         elif Delta < -math.pi:
             Delta+=2*math.pi
         return Delta
+
 
     def SeqWithBalance(self,pos1,pos2,T,dt, COMref = 0):
         if len(pos1) == len(pos2) == len(self._jnt_names):
@@ -413,13 +511,14 @@ class DW_Controller(object):
         else:
             print 'position command legth doest fit'
 
+
     def Sit(self,T):
         self.JC.set_gains("l_arm_mwx",20,0,15)
         self.JC.set_gains("r_arm_mwx",20,0,15)
         self.JC.set_gains("l_arm_elx",50,0,15)
         self.JC.set_gains("r_arm_elx",50,0,15)
         pos = copy(self.SitDwnSeq1)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,T*0.5,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,T*0.5,0.005)
         # self.SeqWithBalance(self.RS.GetJointPos(),self.SitDwnSeq1,T*0.3,0.005)
         self.JC.set_pos("l_leg_uay",-0.1)
         self.JC.set_pos("r_leg_uay",-0.1)
@@ -438,11 +537,12 @@ class DW_Controller(object):
         # self.JC.set_gains("r_leg_uay",50,0,5,set_default = False)
         # self.JC.set_gains("l_leg_lax",50,0,5,set_default = False)
         # self.JC.set_gains("r_leg_lax",50,0,5,set_default = False)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq2,T*0.2,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq2,T*0.2,0.005)
         self.JC.set_gains("l_arm_mwx",400,0,10)
         self.JC.set_gains("r_arm_mwx",400,0,10)
         # self.JC.send_command()
         # rospy.sleep(T*0.2)
+
 
     def DoPath(self,Path):
         for Point in Path:
@@ -485,6 +585,7 @@ class DW_Controller(object):
             self.BackCrawl()
 
         self._stuck_counter = 0
+
 
     def PerformStep(self):
         result = False
@@ -544,6 +645,7 @@ class DW_Controller(object):
                 self.FollowPath = 0
         return result
 
+
     def Crawl(self):
         # self.IMU_mon.turned = 0
         if self.FollowPath == 1:
@@ -553,14 +655,22 @@ class DW_Controller(object):
             Correction = self.DeltaAngle(self.DesOri,y)
             print("Bearing: %f, DesOri: %f, Coorection = %f" % (y,self.DesOri,Correction))
 
-            Delta = Correction/0.4
+            Delta = Correction/0.2
             if abs(Delta)>1:
                 Delta /= abs(Delta)
 
             self.AddRotation(Delta)
 
+        if self.RotFlag == 1:
+            print "Getting ready"
+            self.RotFlag = 2
+            self.CurSeqStep = 0
+            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],0.5,0.005)
+
         self.GoToSeqStep(len(self.StepDur))
+        rospy.sleep(0.2)
         self.RotFlag = 0
+
 
     def BackCrawl(self):
         # self.IMU_mon.turned = 1
@@ -575,14 +685,12 @@ class DW_Controller(object):
 
             self.AddBackRotation(Delta)
 
-        #     if self.RotFlg == 1:
-        #         self.AddBackRotation(Delta)
-
         if self.RotFlag == 1:
             self.RotFlag = 2
             self.GoToBackSeqStep(1)
 
         self.GoToBackSeqStep(len(self.StepDur2))
+
 
     def GoToSeqStep(self,Step):
         if Step == self.CurSeqStep:
@@ -593,6 +701,7 @@ class DW_Controller(object):
                 self.DoSeqStep()
             while self.CurSeqStep != Step:
                 self.DoSeqStep()
+
 
     def GoToBackSeqStep(self,Step):
         if Step == self.CurSeqStep2:
@@ -605,16 +714,16 @@ class DW_Controller(object):
                 self.DoInvSeqStep()
 
     
-
     def DoSeqStep(self): 
         print 'Doing Step seq #',self.CurSeqStep
         #self.traj_with_impedance(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throtle,0.005) 
-        self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throtle,0.005) 
+        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throtle,0.005) 
         self.JC.reset_gains()
         self.CurSeqStep += 1
         if self.CurSeqStep > len(self.StepDur)-1:
             self.CurSeqStep = 0
     
+
     def DoInvSeqStep(self):
         if self._terrain =='HILLS':
             if self.CurSeqStep == 2: ###### NEW ######
@@ -638,7 +747,7 @@ class DW_Controller(object):
             if self.CurSeqStep2 == 1 or self.CurSeqStep2 == 2:
                 pos = list(self.RS.GetJointPos())
                 pos[2] = -1.3*self.IMU_mon.roll 
-                self.JC.send_pos_traj(list(self.RS.GetJointPos()),pos,0.2,0.01)
+                self.send_pos_traj(list(self.RS.GetJointPos()),pos,0.2,0.01)
                 self.RobotCnfg2[self.CurSeqStep2][2] = pos[2] ###### NEW ######
 
                 # pos = copy(self.RobotCnfg2[1][:])
@@ -648,7 +757,7 @@ class DW_Controller(object):
                 #     self.CurSeqStep2 = 0
                 # return
 
-        self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[self.CurSeqStep2],self.StepDur2[self.CurSeqStep2]/self.Throtle,0.005) 
+        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[self.CurSeqStep2],self.StepDur2[self.CurSeqStep2]/self.Throtle,0.005) 
         self.JC.reset_gains()
         self.CurSeqStep2 += 1
         if self.CurSeqStep2 > len(self.StepDur2)-1:
@@ -656,27 +765,18 @@ class DW_Controller(object):
         # if self.CurSeqStep2 > 4:
         #     self.CurSeqStep2 = 0
 
-    def AddRotation(self,Delta):
-        # Delta of 1 gives approx. 0.4 radians turn right
-        # Add gait changes to appropriate step
-        # self.RobotCnfg[2][2] = -Delta*0.15
-        # self.RobotCnfg[2][0] = Delta*0.1
-        # self.RobotCnfg[2][4] = self.BaseHipZ+Delta*0.1
-        # self.RobotCnfg[2][4+6] = -self.BaseHipZ+Delta*0.1
-        # self.RobotCnfg[2][5] = self.BaseHipZ+Delta*0.2
-        # self.RobotCnfg[2][5+6] = -self.BaseHipZ+Delta*0.2
 
-        # # Insert those changes in following steps as well
-        # self.RobotCnfg[3][0] = Delta*0.1
-        # self.RobotCnfg[3][4] = self.BaseHipZ+Delta*0.1
-        # self.RobotCnfg[3][4+6] = -self.BaseHipZ+Delta*0.1
-        # self.RobotCnfg[3][5] = self.BaseHipZ+Delta*0.2
-        # self.RobotCnfg[3][5+6] = -self.BaseHipZ+Delta*0.2
-        # self.RobotCnfg[4][4] = self.BaseHipZ+Delta*0.1
-        # self.RobotCnfg[4][4+6] = -self.BaseHipZ+Delta*0.1
-        # self.RobotCnfg[4][5] = self.BaseHipZ+Delta*0.2
-        # self.RobotCnfg[4][5+6] = -self.BaseHipZ+Delta*0.2
-        pass
+    def AddRotation(self,Delta):
+        # Delta of 1 gives approx. 0.2 radians turn right
+        # Add gait changes to appropriate step
+        self.RobotCnfg[2][0] = Delta*0.1
+
+        # Insert those changes in following steps as well
+        self.RobotCnfg[3][0] = Delta*0.1
+        self.RobotCnfg[4][4] = self.BaseHipZ+Delta*0.1
+        self.RobotCnfg[4][4+6] = -self.BaseHipZ+Delta*0.1
+        self.RobotCnfg[0][4] = self.BaseHipZ+Delta*0.1
+        self.RobotCnfg[0][4+6] = -self.BaseHipZ+Delta*0.1
 
 
     def AddBackRotation(self,Delta):
@@ -702,12 +802,13 @@ class DW_Controller(object):
         self.RobotCnfg2[0][0] = 0
         self.RobotCnfg2[0][2] = 0
 
+
     def RotateToOri(self,Bearing):
         if self._terrain == "MUD" or self._terrain == "HILLS":
             return self.RotateToOriInMud(Bearing)
         else:
             if self.RotFlag == 2:
-                self.GoToBackSeqStep(1)
+                self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1][:],1,0.01)
             self.RotFlag = 1
 
             # Make sure Bearing is from -pi to +pi
@@ -729,12 +830,13 @@ class DW_Controller(object):
             pos[18] = pos[18+6] = 2
             pos[19] = 1.0
             pos[19+6] = -1.0
-            self.JC.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01) 
+            self.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01) 
 
             # Get current orientation
             y0,p,r = self.current_ypr()
             Angle=self.DeltaAngle(Bearing,y0)
 
+            icount = 0
             while abs(Angle)>0.3:#0.15: # Error of 9 degrees
                 print 'Delta: ',Angle,'Bearing: ',Bearing, 'yaw: ',y0
                 Delta = Angle/0.75
@@ -753,24 +855,30 @@ class DW_Controller(object):
                 # Get current orientation
                 y,p,r = self.current_ypr()
                 if abs(self.DeltaAngle(y,y0))<0.1:
-                    # Robot isn't turning, try RotateInMud
-                    return self.RotateToOriInMud(Bearing)
+                    icount = icount+1
+                    if icount>2:
+                        # Robot isn't turning, try RotateInMud
+                        return self.RotateToOriInMud(Bearing)
+                    else:
+                        print("Rotation failed, attempt %d" % icount)
 
                 y0 = y
                 Angle=self.DeltaAngle(Bearing,y0)
 
             # # Return to original configuration
 
-            # self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[0][:],0.5,0.01) 
+            # self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[0][:],0.5,0.01) 
             # self.CurSeqStep = 0
             # self.CurSeqStep2 = 0
             #############################################
             # Return to original configuration
 
-            self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],2,0.01)
-            rospy.sleep(1)
-            self.CurSeqStep2 = 4
+            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1][:],1,0.01)
+            rospy.sleep(0.5)
+            self.CurSeqStep = 0
+            self.CurSeqStep2 = 0
             return 1
+
 
     def RotateToOriInMud(self,Bearing):
         self.RotFlag = 1
@@ -782,7 +890,7 @@ class DW_Controller(object):
         if Bearing < -math.pi:
             Bearing += 2*math.pi
 
-        self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],1.5,0.01)
+        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],1.5,0.01)
 
         # Get current orientation
         y0,p,r = self.current_ypr()
@@ -812,32 +920,43 @@ class DW_Controller(object):
             Angle=self.DeltaAngle(Bearing,y0)
 
         # # Return to original configuration
-        # self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[0][:],0.5,0.01) 
+        # self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[0][:],0.5,0.01) 
         # self.CurSeqStep = 0
         # self.CurSeqStep2 = 0
 
         #############################################
             # Return to original configuration
 
-        self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],2,0.01)
+        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],2,0.01)
         rospy.sleep(1)
         self.CurSeqStep2 = 4
         return 1
 
+
     def RotSpotSeq(self,Delta):
         # Delta of 1 gives a left rotation of approx. 0.75 radians
+        knee0 = 1.1
+        hip0 = self.BaseHipZ/2
+        arm0 = 1.0
+        d_arm = 0.5
 
         # Init configuration
         pos=copy(self.RobotCnfg[2][:])
         pos[1] = 0.8
         pos[6] = pos[6+6] = -1.7
+        pos[7] = pos[7+6] = knee0
         pos[8] = pos[8+6] = 0.8
+        pos[9] = pos[9+6] = 0
         pos[16] = pos[16+6] = 0.9
-        pos[17] = -0.9
-        pos[17+6] = 0.9
-        pos[18] = pos[18+6] = 2
-        pos[19] = 1.0
-        pos[19+6] = -1.0
+        pos[17] = -arm0
+        pos[17+6] = arm0
+        pos[18] = pos[18+6] = 2.3
+        pos[19] = 0.6
+        pos[19+6] = -0.6
+
+        if self.RotFlag != 1:
+            self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.005) 
+        self.RotFlag = 1
 
         T=1.
         if Delta>0:
@@ -848,91 +967,127 @@ class DW_Controller(object):
             dID = 6
         Delta = abs(Delta)
 
-        # Lift first leg
-        pos[7+dID] = 1.3-0.5*Delta
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.05*T,0.005) 
+        # Lift first leg (and arm)
+        pos[7+dID] = knee0-1
+        pos[17+6-dID] = sign*(arm0-d_arm)
+        pos[19+6-dID] = -sign*(0.6+d_arm)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
         # Rotate first leg outwards until it touches ground
-        pos[4+dID] = Delta*sign*0.35
-        pos[4+6-dID] = -Delta*sign*0.35
-        pos[5+6-dID] = -Delta*sign*0.2
-        pos[5+dID] = Delta*sign*0.2
+        pos[4+dID] = hip0*sign+Delta*sign*0.35
+        pos[4+6-dID] = -hip0*sign-Delta*sign*0.35
+        pos[5+dID] = hip0*sign+Delta*sign*0.2
+        pos[5+6-dID] = -hip0*sign-Delta*sign*0.2
         pos[9+dID] = Delta*sign*0.2
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.3*T,0.005) 
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.24*T,0.005) 
         # Lift other leg, now all the weight is on first leg
-        pos[7+dID] = 1.3-0.1*Delta
-        pos[7+6-dID] = 1.3-0.5*Delta
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.05*T,0.005) 
+        pos[7+dID] = knee0
+        pos[17+dID] = -sign*(arm0-d_arm)
+        pos[19+dID] = sign*(0.6+d_arm)
+        pos[7+6-dID] = knee0-1
+        pos[17+6-dID] = sign*(arm0)
+        pos[19+6-dID] = -sign*(0.6)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
         # Return first leg and torso to original configuration
-        pos[4+dID] = 0
-        pos[4+6-dID] = 0
-        pos[5+6-dID] = 0
-        pos[5+dID] = 0
-        pos[7+dID] = 1.3
+        pos[4+dID] = hip0*sign
+        pos[4+6-dID] = -hip0*sign
+        pos[5+dID] = hip0*sign
+        pos[5+6-dID] = -hip0*sign
+        pos[7+dID] = knee0
         pos[9+dID] = 0
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.5*T,0.005) 
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.24*T,0.005) 
         # Return other leg to original configuration
-        pos[7+6-dID] = 1.3
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.1*T,0.005) 
+        pos[7+6-dID] = knee0
+        pos[17+dID] = -sign*(arm0)
+        pos[19+dID] = sign*(0.6)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
         rospy.sleep(0.1*T)
 
+
     def RotOnMudSeq(self,Delta):
-       # Delta of 1 gives a left rotation of approx. 0.45 radians
-       if Delta>0:
-           dID = 0
-       else:
-           dID = 6
+        # Delta of 1 gives a left rotation of approx. 0.45 radians
+        if Delta>0:
+            dID = 0
+            sign = 1
+        else:
+            dID = 6
+            sign = -1
 
-       T=1
+        self.RotFlag = 1
+        T=1
 
-       # Get into starting position
-       pos = copy(self.RobotCnfg2[4][:])
-       pos[1] = 0.8
-       # Get current orientation
-       y0,p,r = self.current_ypr()
-       pos[2] = -0.5*r
-       pos[6] = pos[6+6] = -1.3
-       pos[16] = pos[16+6] = 0.6
-       pos[17] = -1.2
-       pos[17+6] = 1.2
-       pos[18] = pos[18+6] = 1.8
-       self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.5*T,0.01)
-       # pos[6] -= 0.2
+        # Get into starting position
+        pos = copy(self.RobotCnfg2[4][:])
+        pos[1] = 0.8
+        # Get current orientation
+        # y0,p,r = self.current_ypr()
+        # pos[2] = -0.5*r
+        pos[4] = 0.1
+        pos[4+6] = -0.1
+        pos[5] = 0.1
+        pos[5+6] = -0.1
+        pos[6] = pos[6+6] = -1.2
+        pos[7] = pos[7+6] = 2.0
+        pos[8] = pos[8+6] = 0.3
+        pos[9] = pos[9+6] = 0
+        pos[16] = pos[16+6] = 1.1
+        pos[17] = -1.1
+        pos[17+6] = 1.1
+        pos[18] = pos[18+6] = 1.8
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5*T,0.01)
 
-       # Lift first leg
-       pos[2] = 0
-       pos[6+dID] = -1.7
-       self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.01)
+        # Lift first leg
+        # pos[2] = 0
+        pos[6+dID] = -1.7
+        pos[7+dID] = 2.3
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.01)
 
-       # Rotate it to the side
-       pos[4+dID] = 0.8*Delta
-       pos[0] = -0.4*Delta
-       pos[4+6-dID] = -0.4*Delta
-       self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.4*T,0.01)
+        # Rotate it to the side
+        # pos[0] = -0.2*Delta
+        pos[2] = 0.2*Delta
+        pos[5+dID] = 0.1+0.4*Delta
+        pos[4+6-dID] = sign*(-0.1-0.2*Delta)
+        pos[5+6-dID] = -0.1-0.2*Delta
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.4*T,0.01)
 
-       # Lower first leg / Lift second leg
-       pos[6+dID] = -1.3
-       pos[6+6-dID] = -1.8
-       self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.01)
+        # Lower first leg / Lift second leg
+        pos[6+dID] = -1.2
+        pos[7+dID] = 2.0
+        pos[8+dID] = 0.2
+        pos[6+6-dID] = -1.7
+        pos[7+6-dID] = 2.3
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.01)
 
-       # Rotate pelvis / Close first leg
-       pos[0] = -0.8*Delta
-       pos[4+dID] = 0
-       pos[4+6-dID] = 0
-       self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.4*T,0.01)
+        # Rotate pelvis / Close first leg
+        pos[4] = 0.1
+        pos[4+6] = -0.1
+        pos[5] = 0.1
+        pos[5+6] = -0.1
+        pos[2] = 0
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.4*T,0.01)
 
-       # Return to init
-       pos[1] = 0.9
-       pos[6] = pos[6+6] = -1.3
-       self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.01)
+        # Return to init
+        pos[6] = pos[6+6] = -1.2
+        pos[7] = pos[7+6] = 2.0
+        pos[8] = pos[8+6] = 0.3
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.01)
 
-       # Lift arms
-       pos = copy(self.RobotCnfg2[0][:])
-       y0,p,r = self.current_ypr()
-       pos[2] = -0.5*r
-       self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
+        # Lift arms
+        pos[1] = 1
+        pos[6] = pos[6+6] = -1.5
+        pos[7] = pos[7+6] = 1.6
+        pos[8] = pos[8+6] = 0.7
+        pos[17] = -0.8
+        pos[17+6] = 0.8
+        pos[18] = pos[18+6] = 2.3
+        pos[19] = 1.4
+        pos[19+6] = -1.4
+        # pos = copy(self.RobotCnfg2[1][:])
+        # # y0,p,r = self.current_ypr()
+        # # pos[2] = -0.5*r
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
+
 
     def CheckTipping(self):
-        
         result = 0
         while result == 0:
             # Get current orientation
@@ -972,36 +1127,36 @@ class DW_Controller(object):
                 self._fall_count = 0
 
 
-
-
     def TipRecovery(self,side):
         self.count_tipping += 1
         print 'Tipping:', self.count_tipping
-        if side == "right":
-            dID = 0
+
+        dID = 0
         sign = 1
-        if side == "left":
+        if side == "right":        
             dID = 6
             sign = -1
-        
-        # Extend legs and flex arm
-        pos = copy(self.RobotCnfg[4][:])
-        pos[7] = pos[7+6] = 0.8
-        pos[17+6-dID] = 0
-#        pos[18+6-dID] = 2.8
-        pos[19+6-dID] = -sign*1.8
-        pos[21+6-dID] = -sign*1.4
-        # self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.4,0.01)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.8,0.01)
 
-        # Widen leg stance, turn with hip
-        pos[2] = -sign*0.5
-        pos[4] = 0.5
-        pos[4+6] = -0.5
-        # self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.4,0.01)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.8,0.01)
-        ###############NEW #################
-                    
+        # # Simple way of turning fwd
+        # pos = copy(self.RobotCnfg[-1][:])
+        # pos[17+dID] = sign*1.0
+        # self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
+
+        pos = copy(self.RobotCnfg[-1][:])
+        pos[18+dID] = 3
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
+        rospy.sleep(0.1)
+
+        # Extend leg and bend arm
+        pos = copy(self.RobotCnfg[-1][:])
+        pos[7+dID] = 0.8
+        pos[19+dID] = sign*2.35
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
+
+        rospy.sleep(0.1)
+        pos = copy(self.RobotCnfg[-1][:])
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
+
         R,P,Y = self.RS.GetIMU()
           
         if  P>=0.8:
@@ -1009,35 +1164,17 @@ class DW_Controller(object):
             result = self.FrontTipRecovery()
             return result
 
-        # Push with arm to rotate
-        pos[16+6-dID] = 0.2
-        # self.JC.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,1.2,0.01)
-
-        rospy.sleep(0.5)
-
-        # Return to final sequence pos (forward)
-        pos = copy(self.RobotCnfg[4][:])
-        pos[4] = 0.3
-        pos[4+6] = -0.3
-        pos[5] = 0.3
-        pos[5+6] = -0.3
-        # self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.9,0.01)
-        rospy.sleep(1.5)
-
         # Get current orientation
         y,p,r = self.current_ypr()
         if abs(r)<math.pi/4:
             # Success!
-            self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],2,0.01)
-            rospy.sleep(1)
-            self.CurSeqStep2 = 4
-            # self.GoToBackSeqStep(5)
+            self.CurSeqStep = 0
+            self.CurSeqStep2 = 0
             return 1
 
         else:
             return 0  
+
 
     def BackTipRecovery(self):
         # "Flatten" body on ground, bend elbows
@@ -1052,41 +1189,44 @@ class DW_Controller(object):
         pos[18] = pos[18+6] = 3.14
         pos[19] = 1.1
         pos[19+6] = -1.1
-        # self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.4,0.01)
+        rospy.sleep(0.3)
 
-        # Raise torso on elbows
+        # Bend arms
         pos[1] = 0.8
         pos[16] = pos[16+6] = 1.4
-        pos[17] = 0
-        pos[17+6] = 0
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
+
+        # Prepare to push
+        pos[17] = 1.3
+        pos[17+6] = -1.3
         pos[18] = pos[18+6] = 2.6
-        # self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01)
+        pos[19] = 2.3
+        pos[19+6] = -2.3
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.3,0.01)
 
-        # Extend arms
-        pos[1] = 0.8
-        pos[6] = pos[6+6] = -1.4
-        pos[7] = pos[7+6] = 2.2
-        pos[16] = pos[16+6] = 1.4
-        pos[17] = -1.3
-        pos[17+6] = 1.3
-        pos[19] = pos[19+6] = 0
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,2.2,0.01)#self.JC.send_pos_traj(self.RS.GetJointPos(),pos,2,0.01)
+        # PUSH!!!
+        pos = copy(self.RobotCnfg[-1][:])
+        pos[6] = pos[6+6] = -1.3
+        pos[17] = -1.1
+        pos[17+6] = 1.1
+        pos[18] = pos[18+6] = 2.6
+        pos[19] = pos[19+6] = 0.05
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.3,0.01)
 
-        rospy.sleep(1.5)
+        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1][:],0.5,0.01)
+        rospy.sleep(0.3)
 
         # Get current orientation
         y,p,r = self.current_ypr()
         if abs(p)<0.4*math.pi:
             # Success!
-            self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],2,0.01)
-            rospy.sleep(1)
-            self.CurSeqStep2 = 4
-            # self.GoToBackSeqStep(5)
+            self.CurSeqStep = 0
+            self.CurSeqStep2 = 0
             return 1
         else:
             return 0
+
 
     def FrontTipRecovery(self):
 
@@ -1095,51 +1235,54 @@ class DW_Controller(object):
             0, 0, -0.02, 0.04, -0.02, 0,
             0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0]
-        # self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,2,0.01)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.4,0.01)
 
         pos = [ 0, 0, 0, 0,
             0, 0, 0, 0, -2.1, 0,
             0, 0, 0, 0, -2.1, 0,
             0, 0, 0, 1.5, 0, 0,
             0, 0, 0, -1.5, 0, 0]
-        # self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,1.5,0.01)
+        # self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.3,0.01)
+        rospy.sleep(0.3)
 
         pos = [0, 0.8, 0, 0,
             0, 0, -2, 2, -2.1, 0,
             0, 0, -2, 2, -2.1, 0,
             -1.7, -0.3, 0, 1.5, 0, 0,
             -1.7, 0.3, 0, -1.5, 0, 0]
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
 
         pos = [0, 1.1, 0, 0,
             0, 0, -2.2, 2.8, -2.6, 0,
             0, 0, -2.2, 2.8, -2.6, 0,
             -1.4, -0.8, 1.5, 0, 0, 1.5,
             -1.4, 0.8, 1.5, 0, 0, -1.5] 
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
 
         pos = [0, 0.8, 0, 0,
             0, 0, -2, 2.8, -2.6, 0,
             0, 0, -2, 2.8, -2.6, 0,
-            -1.5, -0.8, 1.5, 0, 0, 0,
-            -1.5, 0.8, 1.5, 0, 0, 0]
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
-        rospy.sleep(2)
-        pos = copy(self.RobotCnfg[4][:])
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01)
+            -1.4, -0.7, 1.5, 0, 0, 0,
+            -1.4, 0.7, 1.5, 0, 0, 0]
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
+
+        rospy.sleep(0.5)
+
+        pos = copy(self.RobotCnfg[-1][:])
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.4,0.01)
+        rospy.sleep(1)
+
         # Get current orientation
         y,p,r = self.current_ypr()
         if abs(p)<0.4*math.pi:
             # Success!
-            self.JC.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],2,0.01)
-            rospy.sleep(1)
-            self.CurSeqStep2 = 4
-            # self.GoToBackSeqStep(5)
+            self.CurSeqStep = 0
+            self.CurSeqStep2 = 0
             return 1
         else:
             return 0
+
 
     def DynStandUp(self):
         # Works only a small percentage of the time
@@ -1151,19 +1294,19 @@ class DW_Controller(object):
         T = 1
 
         # Go to init pos, supported on hands and feet, with pelvis back between hands
-        pos = copy(self.RobotCnfg2[4][:])
+        pos = copy(self.RobotCnfg[-0][:])
         pos[7] = pos[7+6] = 1.2
         pos[8] = pos[8+6] = 0.7
         pos[18] = pos[18+6] = 1.2
         pos[20] = pos[20+6] = 1
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,1.2*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,1.2*T,0.005)
 
         # [Insert description here]
         pos[16] = pos[16+6] = 0.3
         pos[17] = -1.4
         pos[17+6] = 1.4
         pos[19] = pos[19+6] = 0
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
 
         rospy.sleep(0.5)
 
@@ -1181,7 +1324,7 @@ class DW_Controller(object):
         pos[17] = -1.2
         pos[17+6] = 1.2
         pos[8] = pos[8+6] = -0.7
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.5*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5*T,0.005)
 
         pos[1] = 0.2
         pos[7] =  2.1
@@ -1189,7 +1332,7 @@ class DW_Controller(object):
         pos[16] = pos[16+6] = -1.4
         pos[17] = -0.7
         pos[17+6] = 0.7
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
 
         rospy.sleep(1)
 
@@ -1208,18 +1351,19 @@ class DW_Controller(object):
         pos[16] = pos[16+6] = -1.4
         pos[17] = -1.1
         pos[17+6] = 1.1
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
 
         rospy.sleep(0.5)
         pos[17] = -0.9
         pos[17+6] = 0.9
-        self.JC.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
         rospy.sleep(0.5)
 
         rospy.sleep(2)
         self.SeqWithBalance(self.RS.GetJointPos(),self.BasStndPose,3,0.005,[-0.02, 0.175])
         rospy.sleep(0.8)
-        self.JC.send_pos_traj(self.RS.GetJointPos(),self.BasStndPose,0.5*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),self.BasStndPose,0.5*T,0.005)
+
 
     def StandUp(self):
         RPY = self.RS.GetIMU()
@@ -1231,6 +1375,7 @@ class DW_Controller(object):
             RPY = self.RS.GetIMU()
             D, R = self._iTf.TransformListener().lookupTransform('/l_foot','/pelvis',rospy.Time(0))
             print 'roll: ',RPY[0],'pitch: ',RPY[1],'D: ',D[2]
+
 
     def CloseHands(self):
         self.LHC.set_all_pos(self.BaseHandPose)
@@ -1262,14 +1407,17 @@ if __name__=='__main__':
     DW.CloseHands()
 
     while True:
-        try:
-            comm = raw_input("Enter command: ")
-        except KeyboardInterrupt:
-                print "Quitter..."
-                break
+        comm = raw_input("Enter command: ")
+
         if comm == "Exit" or comm == "exit":
             break
-        DW.Interface_cb(String(comm))
+
+        try:
+            DW.Interface_cb(String(comm))
+        except KeyboardInterrupt:
+            print "Interrupting sequence..."
+            break
+
     # rospy.spin()
 
     # DW.Sit(1.5)       
