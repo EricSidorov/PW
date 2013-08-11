@@ -18,6 +18,7 @@ from seq_generator import PW_seq
 import tf
 from sensor_msgs.msg import JointState
 from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Vector3
 from numpy import zeros, array, linspace, arange
 import numpy as np
 from JointController import JointCommands_msg_handler
@@ -87,6 +88,30 @@ class DW_Controller(object):
         self.FALL_LIMIT = 3
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
         self._stat_pub = rospy.Publisher('/PW/status',Status)
+        self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
+
+        # Commands
+        self.Commands = [['sit','Sit down from standing position'],
+                         ['fwd [n]','Crawl forward [n] times'],
+                         ['bwd [n]','Crawl backwards [n] times'],
+                         ['turn [ori]','Turn in place to desired [ori]entation (in radians)'],
+                         ['rot type [fast/slow]','Set rotation type to slow or fast'],
+                         ['rot [delta]','Rotate in place once with strength [delta] (+/- 1)'],
+                         ['recover','Recover from tipping'],
+                         ['stand','Stand up from sitting position'],
+                         ['reset pose','Resets the robot\'s configuration to the default standing pose'],
+                         ['reset','Resets the robot\'s pose and returns it to its starting position'],
+                         ['reload','Reloads the sit down, fwd, and bwd sequences parameters from seq_generator.py'],
+                         ['seq [fwd/bwd] [step]','Brings the robot to step [step] of the [fwd/bwd] sequence'],
+                         ['close hands','Closes the robot\'s hands'],
+                         ['head [up/down] [rad]','Tilts the robot\'s head [up/down] by [rad] radians'],
+                         ['befb [0/1]','Turns the bearing feedback response on [1] or off [0]'],
+                         ['bedes [rad]','Sets the desired bearing for the bearing FB to [rad] radians from the x axis'],
+                         ['terrain [MUD/HILLS/OTHER]','Sets the terrain that the robot is moving on'],
+                         ['status','Shows the status of all the system\'s flags'],
+                         ['commands','Shows the list of all available commands'],
+                         ['help [command]','Provides help on using a command'],
+                         ['exit','Exit this console']]
 
         ##################################################################
         ######################## Controller Gains ########################
@@ -131,37 +156,36 @@ class DW_Controller(object):
         Args.append(CommString)
 
         for Command in Args:
-            String = 'sit'
-            if Command.find(String) == 0:
+            if Command.find(self.Commands[0][0]) == 0: ################ SIT ################
                 MotionType = 1
                 Parameters.append(MotionType)
 
-            String = 'fwd'
-            if Command.find(String) == 0:
+            String = self.Commands[1][0].partition("[")[0]
+            if Command.find(String) == 0: ################ FWD ################
                 MotionType = 2
                 Parameters.append(MotionType)
-                CommParted = Command.partition(String+" ")
+                CommParted = Command.partition(String)
                 NumSteps = int(CommParted[2])
                 Parameters.append(NumSteps)
 
-            String = 'bwd'
-            if Command.find(String) == 0:
+            String = self.Commands[2][0].partition("[")[0]
+            if Command.find(String) == 0: ################ BWD ################
                 MotionType = 3
                 Parameters.append(MotionType)
-                CommParted = Command.partition(String+" ")
+                CommParted = Command.partition(String)
                 NumSteps = int(CommParted[2])
                 Parameters.append(NumSteps)
 
-            String = 'turn'
-            if Command.find(String) == 0:
+            String = self.Commands[3][0].partition("[")[0]
+            if Command.find(String) == 0: ################ TURN ################
                 MotionType = 4
                 Parameters.append(MotionType)
-                CommParted = Command.partition(String+" ")
+                CommParted = Command.partition(String)
                 Bearing = float(CommParted[2])
                 Parameters.append(Bearing)
 
-            String = 'rot'
-            if Command.find(String) == 0:
+            String = self.Commands[4][0].partition(" ")[0]
+            if Command.find(String) == 0: ################ ROT ################
                 CommParted = Command.partition(String+" ")
                 if CommParted[2].find("type") == 0:
                     CommParted2 = CommParted[2].partition(" ")
@@ -178,54 +202,80 @@ class DW_Controller(object):
                     Parameters.append(MotionType)
                     Parameters.append(Delta)
 
-            String = 'recover'
-            if Command.find(String) == 0:
+            String = self.Commands[6][0]
+            if Command.find(String) == 0: ################ RECOVER ################
                 MotionType = 6
                 Parameters.append(MotionType)
 
-            String = 'standup'
-            if Command.find(String) == 0:
+            String = self.Commands[7][0]
+            if Command.find(String) == 0: ################ STAND ################
                 MotionType = 7
                 Parameters.append(MotionType)
 
-            String = 'reset'
-            if Command.find(String) == 0:
-                if Command.find("pose") > 0:
+            if Command.find(self.Commands[9][0]) == 0: ################ RESET ###############
+                if Command.find(self.Commands[8][0]) > 0: ########## RESET POSE #############
                     MotionType = 8
                 else:
                     MotionType = 9
                 Parameters.append(MotionType)
 
-            String = 'reload'
-            if Command.find(String) == 0:
+            if Command.find(self.Commands[10][0]) == 0:
                 MotionType = 10
                 Parameters.append(MotionType)
 
-            String = 'seq'
-            if Command.find(String) == 0:
+            String = self.Commands[11][0].partition("[")[0]
+            if Command.find(String) == 0: ################ SEQ ################
                 MotionType = 11
                 Parameters.append(MotionType)
-                CommParted = Command.partition(String+" ")
+                CommParted = Command.partition(String)
                 CommParted2 = CommParted[2].partition(" ")
                 Sequence = CommParted2[0]
                 SeqStep = int(CommParted2[2])
                 Parameters.append(Sequence)
                 Parameters.append(SeqStep)
 
-            String = 'close hands'
-            if Command.find(String) == 0:
+            if Command.find(self.Commands[12][0]) == 0: ########### CLOSE HANDS ###########
                 MotionType = 12
                 Parameters.append(MotionType)
 
-            String = 'quit'
-            if Command.find(String) == 0:
+            String = self.Commands[13][0].partition("[")[0]
+            if Command.find(String) == 0: ################ HEAD ################
                 MotionType = -1
-                Quit = 1
-            else:
-                Quit = 0
+                CommParted = Command.partition(String)
+                CommParted2 = CommParted[2].partition(" ")
+                if CommParted2[0].find("up"):
+                    self.HeadPitch = self.HeadPitch + float(CommParted2[2])
+                if CommParted2[0].find("down"):
+                    self.HeadPitch = self.HeadPitch - float(CommParted2[2])
+                self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1],0.5,0.005)
 
-            String = 'status'
-            if Command.find(String) == 0:
+            String = self.Commands[14][0].partition("[")[0]
+            if Command.find(String) == 0: ################ BEFB ################
+                MotionType = -1
+                CommParted = Command.partition(String)
+                self.FollowPath = int(CommParted[2])
+                if self.FollowPath == 0:
+                    self.AddRotation(0)
+                    self.AddBackRotation(0)
+                    print "Bearing feedback is now OFF"
+                else:
+                    print "Bearing feedback is now ON"
+
+            String = self.Commands[15][0].partition("[")[0]
+            if Command.find(String) == 0: ################ BEDES ################
+                MotionType = -1
+                CommParted = Command.partition(String)
+                self.DesOri = float(CommParted[2])
+                print("Desired bearing set to: %f" % self.DesOri)
+
+            String = self.Commands[16][0].partition("[")[0]
+            if Command.find(String) == 0: ################ TERRAIN ################
+                MotionType = -1
+                CommParted = Command.partition(String)
+                self._terrain = CommParted[2]
+                print("Terrain type set to: %s" % self._terrain)
+
+            if Command.find(self.Commands[17][0]) == 0: ########### STATUS ###########
                 MotionType = -1
                 if self.FollowPath == 0:
                     print "Bearing feedback is now OFF"
@@ -238,47 +288,21 @@ class DW_Controller(object):
                 else:
                     print "Rotation mode set to slow"
 
-            String = 'terrain'
-            if Command.find(String) == 0:
+            if Command.find(self.Commands[18][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
-                CommParted = Command.partition(String+" ")
-                self._terrain = CommParted[2]
-                print("Terrain type set to: %s" % self._terrain)
+                print "Available commands:"
+                com_string = ""
+                for com in self.Commands:
+                    com_string += com[0]+", "
+                print com_string[0:-2]
 
-            String = 'befb'
-            if Command.find(String) == 0:
+            String = self.Commands[19][0].partition("[")[0]
+            if Command.find(String) == 0: ########### HELP ###########
                 MotionType = -1
-                CommParted = Command.partition(String+" ")
-                self.FollowPath = int(CommParted[2])
-                if self.FollowPath == 0:
-                    self.AddRotation(0)
-                    self.AddBackRotation(0)
-                    print "Bearing feedback is now OFF"
-                else:
-                    print "Bearing feedback is now ON"
-
-            String = 'bedes'
-            if Command.find(String) == 0:
-                MotionType = -1
-                CommParted = Command.partition(String+" ")
-                self.DesOri = float(CommParted[2])
-                print("Desired bearing set to: %f" % self.DesOri)
-
-            String = 'head'
-            if Command.find(String) == 0:
-                MotionType = -1
-                CommParted = Command.partition(String+" ")
-                CommParted2 = CommParted[2].partition(" ")
-                if CommParted2[0].find("up"):
-                    self.HeadPitch = self.HeadPitch + float(CommParted2[2])
-                if CommParted2[0].find("down"):
-                    self.HeadPitch = self.HeadPitch - float(CommParted2[2])
-                self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1],0.5,0.005)
-
-        if Quit == 1:
-            self._stat_pub.publish(Status("Free"))
-            rospy.signal_shutdown("Received QUIT command")
-            exit()
+                CommParted = Command.partition(String)
+                for com in self.Commands:
+                    if com[0].find(CommParted[2])>=0:
+                        print com[0]+" - "+com[1] 
             
         if MotionType == 0:
             print("Got no command param, aborting...")
@@ -430,6 +454,9 @@ class DW_Controller(object):
         # self.GlobalOri = msg.pose.pose.pose.orientation # from C25_GlobalPosition
         self.GlobalPos = msg.pose.pose.position    # from /ground_truth_odom
         self.GlobalOri = msg.pose.pose.orientation # from /ground_truth_odom
+
+        y,p,r = self.current_ypr()
+        self._rpy_pub.publish(Vector3(r,p,y))
 
 
     def move_neck(self):
@@ -786,14 +813,17 @@ class DW_Controller(object):
         else:
             dID = 6
 
+        if abs(Delta)>1:
+            Delta = Delta/abs(Delta)
+
         # Add gait changes to appropriate step
-        self.RobotCnfg2[1][0] = 0.3*Delta
+        self.RobotCnfg2[1][0] = 0.25*Delta
         self.RobotCnfg2[1][2] = 0.15*Delta
         self.RobotCnfg2[3][0] = 0
         self.RobotCnfg2[3][2] = 0
 
         # Insert those changes in following steps as well
-        self.RobotCnfg2[2][0] = 0.3*Delta
+        self.RobotCnfg2[2][0] = 0.25*Delta
         self.RobotCnfg2[2][2] = 0.15*Delta
         self.RobotCnfg2[3][0] = 0.3*Delta
         self.RobotCnfg2[3][2] = 0.15*Delta
@@ -1004,7 +1034,10 @@ class DW_Controller(object):
 
 
     def RotOnMudSeq(self,Delta):
-        # Delta of 1 gives a left rotation of approx. 0.45 radians
+        # Delta of 1 gives a left rotation of approx. 0.35 radians
+
+        knee0 = 1.0
+        kneediff = 0.3
         if Delta>0:
             dID = 0
             sign = 1
@@ -1025,66 +1058,78 @@ class DW_Controller(object):
         pos[4+6] = -0.1
         pos[5] = 0.1
         pos[5+6] = -0.1
-        pos[6] = pos[6+6] = -1.2
-        pos[7] = pos[7+6] = 2.0
-        pos[8] = pos[8+6] = 0.3
+        pos[6] = pos[6+6] = -1.3
+        pos[7] = pos[7+6] = knee0
+        pos[8] = pos[8+6] = 0.5
         pos[9] = pos[9+6] = 0
-        pos[16] = pos[16+6] = 1.1
+        if Delta>0:
+            pos[16] = 0.6-0.3*Delta
+            pos[16+6] = 0.6
+        else:
+            pos[16] = 0.6
+            pos[16+6] = 0.6+0.3*Delta
         pos[17] = -1.1
         pos[17+6] = 1.1
-        pos[18] = pos[18+6] = 1.8
-        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5*T,0.01)
+        pos[18] = pos[18+6] = 2.5
+        pos[19] = 0.5
+        pos[19+6] = -0.5
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
 
         # Lift first leg
         # pos[2] = 0
         pos[6+dID] = -1.7
-        pos[7+dID] = 2.3
+        pos[7+dID] = knee0+kneediff
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.01)
 
         # Rotate it to the side
-        # pos[0] = -0.2*Delta
-        pos[2] = 0.2*Delta
-        pos[5+dID] = 0.1+0.4*Delta
-        pos[4+6-dID] = sign*(-0.1-0.2*Delta)
-        pos[5+6-dID] = -0.1-0.2*Delta
+        pos[0] = 0.15*Delta
+        # pos[2] = 0.2*Delta
+        # pos[5+dID] = 0.1+0.4*Delta
+        pos[4+dID] = sign*(0.1+0.2*Delta)
+        pos[5+dID] = 0.1+0.2*Delta
+        pos[7+dID] = knee0
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.4*T,0.01)
 
         # Lower first leg / Lift second leg
         pos[6+dID] = -1.2
-        pos[7+dID] = 2.0
-        pos[8+dID] = 0.2
+        # pos[8+dID] = 0.2
         pos[6+6-dID] = -1.7
-        pos[7+6-dID] = 2.3
+        # pos[7+6-dID] = knee0+kneediff
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.01)
 
         # Rotate pelvis / Close first leg
+        pos[0] = 0
         pos[4] = 0.1
         pos[4+6] = -0.1
         pos[5] = 0.1
         pos[5+6] = -0.1
-        pos[2] = 0
+        # pos[2] = 0
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.4*T,0.01)
 
         # Return to init
-        pos[6] = pos[6+6] = -1.2
-        pos[7] = pos[7+6] = 2.0
-        pos[8] = pos[8+6] = 0.3
+        pos[6] = pos[6+6] = -1.3
+        pos[7] = pos[7+6] = knee0
+        pos[8] = pos[8+6] = 0.5
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.01)
 
         # Lift arms
-        pos[1] = 1
         pos[6] = pos[6+6] = -1.5
-        pos[7] = pos[7+6] = 1.6
         pos[8] = pos[8+6] = 0.7
-        pos[17] = -0.8
-        pos[17+6] = 0.8
-        pos[18] = pos[18+6] = 2.3
-        pos[19] = 1.4
-        pos[19+6] = -1.4
+        pos[17] = -0.5
+        pos[17+6] = 0.5
+        pos[16] = pos[16+6] = 0.8
+        pos[18] = pos[18+6] = 2.5
+        pos[19] = 1.1
+        pos[19+6] = -1.1
+
         # pos = copy(self.RobotCnfg2[1][:])
         # # y0,p,r = self.current_ypr()
         # # pos[2] = -0.5*r
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
+
+        # self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
+
+        # raise KeyboardInterrupt
 
 
     def CheckTipping(self):
@@ -1123,8 +1168,9 @@ class DW_Controller(object):
                 # print "Left recovery"
             else:
                 result = 1
-                self.FollowPath = 1
+                # self.FollowPath = 1
                 self._fall_count = 0
+        self.RotFlag = 1
 
 
     def TipRecovery(self,side):
@@ -1143,20 +1189,35 @@ class DW_Controller(object):
         # self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
 
         pos = copy(self.RobotCnfg[-1][:])
-        pos[18+dID] = 3
+        pos[18+dID] = 2.4
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
         rospy.sleep(0.1)
 
         # Extend leg and bend arm
         pos = copy(self.RobotCnfg[-1][:])
         pos[7+dID] = 0.8
+        pos[17+dID] = -sign*1.3
+        pos[18+dID] = 2.6
         pos[19+dID] = sign*2.35
-        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.3,0.01)
 
         rospy.sleep(0.1)
-        pos = copy(self.RobotCnfg[-1][:])
-        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.01)
 
+        # Push body by rotating arm
+        pos[18+dID] = 1.2
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
+
+        rospy.sleep(0.1)
+
+        # Extend arm back to normal
+        pos[17+dID] = -sign*1.1
+        pos[19+dID] = sign*0.05
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
+
+        pos = copy(self.RobotCnfg[-1][:])
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
+
+        rospy.sleep(0.5)
         R,P,Y = self.RS.GetIMU()
           
         if  P>=0.8:
@@ -1215,7 +1276,7 @@ class DW_Controller(object):
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.3,0.01)
 
         self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1][:],0.5,0.01)
-        rospy.sleep(0.3)
+        rospy.sleep(0.5)
 
         # Get current orientation
         y,p,r = self.current_ypr()
@@ -1263,15 +1324,15 @@ class DW_Controller(object):
         pos = [0, 0.8, 0, 0,
             0, 0, -2, 2.8, -2.6, 0,
             0, 0, -2, 2.8, -2.6, 0,
-            -1.4, -0.7, 1.5, 0, 0, 0,
-            -1.4, 0.7, 1.5, 0, 0, 0]
+            -1.3, -0.7, 0, 0, 0, 0,
+            -1.3, 0.7, 0, 0, 0, 0]
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
 
-        rospy.sleep(0.5)
+        rospy.sleep(0.4)
 
         pos = copy(self.RobotCnfg[-1][:])
-        self.send_pos_traj(self.RS.GetJointPos(),pos,0.4,0.01)
-        rospy.sleep(1)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6,0.01)
+        rospy.sleep(0.5)
 
         # Get current orientation
         y,p,r = self.current_ypr()
@@ -1294,47 +1355,65 @@ class DW_Controller(object):
         T = 1
 
         # Go to init pos, supported on hands and feet, with pelvis back between hands
-        pos = copy(self.RobotCnfg[-0][:])
+        pos = copy(self.RobotCnfg[0][:])
+        pos[1] = 0.3
+        pos[4] = pos[4+6] = 0
+        pos[5] = pos[5+6] = 0
         pos[7] = pos[7+6] = 1.2
         pos[8] = pos[8+6] = 0.7
-        pos[18] = pos[18+6] = 1.2
-        pos[20] = pos[20+6] = 1
-        self.send_pos_traj(self.RS.GetJointPos(),pos,1.2*T,0.005)
+        pos[16] = pos[16+6] = 0.5
+        pos[19] = 0.8
+        pos[19+6] = -0.8
+        pos[18] = pos[18+6] = 2.7
+        pos[19] = 0.8
+        pos[19+6] = -0.8
+        pos[20] = pos[20+6] = 0
+        pos[21] = pos[21+6] = 0
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5*T,0.005)
+        rospy.sleep(0.5)
 
         # [Insert description here]
         pos[16] = pos[16+6] = 0.3
         pos[17] = -1.4
         pos[17+6] = 1.4
         pos[19] = pos[19+6] = 0
-        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5*T,0.005)
 
-        rospy.sleep(0.5)
+        rospy.sleep(0.2)
 
         # Tuck legs in and start rotation
         pos[1] = 0.8
         pos[5] = 0.1
         pos[5+6] = -0.1
-        pos[6] =  -1.7
-        pos[6+6] = -1.7
-        pos[7] =  2.4
-        pos[7+6] = 2.4
+        pos[6] = pos[6+6] = -1.7
+        pos[7] = pos[7+6] = 2.4
+        pos[8] = pos[8+6] = -0.7
         pos[9] = -0.1
         pos[9+6] = 0.1
         pos[16] = pos[16+6] = -0.5
         pos[17] = -1.2
         pos[17+6] = 1.2
-        pos[8] = pos[8+6] = -0.7
-        self.send_pos_traj(self.RS.GetJointPos(),pos,0.5*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.005)
 
         pos[1] = 0.2
-        pos[7] =  2.1
-        pos[7+6] = 2.1
-        pos[16] = pos[16+6] = -1.4
-        pos[17] = -0.7
-        pos[17+6] = 0.7
-        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
+        pos[16] = pos[16+6] = -1.3
+        pos[17] = -0.6
+        pos[17+6] = 0.6
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.3*T,0.005)
+        rospy.sleep(0.2)
 
-        rospy.sleep(1)
+        pos[6] = pos[6+6] = 0
+        pos[17] = -0.5
+        pos[17+6] = 0.5
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.2*T,0.005)
+        rospy.sleep(0.3)
+        pos[6] = pos[6+6] = -1.7
+        pos[17] = -0.9
+        pos[17+6] = 0.9
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.1*T,0.005)
+
+        # rospy.sleep(1)
+        rospy.sleep(0.5)
 
         # Use hands to push off and place COM on feet
         self.JC.set_gains('l_leg_uay',900,0,10)
@@ -1346,23 +1425,24 @@ class DW_Controller(object):
         self.JC.set_gains('l_arm_shx',1000,0,10)
         self.JC.set_gains('r_arm_shx',1000,0,10)
         pos[1] = 0.7
-        pos[7] =  2.4
-        pos[7+6] = 2.4
         pos[16] = pos[16+6] = -1.4
         pos[17] = -1.1
         pos[17+6] = 1.1
-        self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),pos,0.4*T,0.005)
+        rospy.sleep(0.2)
 
         rospy.sleep(0.5)
         pos[17] = -0.9
         pos[17+6] = 0.9
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.005)
-        rospy.sleep(0.5)
 
         rospy.sleep(2)
-        self.SeqWithBalance(self.RS.GetJointPos(),self.BasStndPose,3,0.005,[-0.02, 0.175])
-        rospy.sleep(0.8)
-        self.send_pos_traj(self.RS.GetJointPos(),self.BasStndPose,0.5*T,0.005)
+        RPY = self.RS.GetIMU()
+        print RPY
+        if abs(RPY[0])+abs(RPY[1])<0.2:
+            self.SeqWithBalance(self.RS.GetJointPos(),self.BasStndPose,3,0.005,[-0.02, 0.175])
+            rospy.sleep(0.8)
+            self.send_pos_traj(self.RS.GetJointPos(),self.BasStndPose,0.5*T,0.005)
 
 
     def StandUp(self):
@@ -1400,11 +1480,11 @@ if __name__=='__main__':
     # Subscribe to topic controller
     rospy.Subscriber('/DW_control',String,DW.Interface_cb)
 
-    #self._Subscribers["Odometry"] = rospy.Subscriber('/ground_truth_odom',Odometry,self._Controller.Odom_cb)
     rospy.Subscriber('/atlas/atlas_state',AtlasState,DW.RS_cb)
+    rospy.sleep(0.1)
+    DW.send_pos_traj(DW.RS.GetJointPos(),array(DW.RS.GetJointPos()),0.1,0.005)
     DW.CloseHands()
     rospy.sleep(0.1)
-    DW.CloseHands()
 
     while True:
         comm = raw_input("Enter command: ")

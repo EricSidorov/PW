@@ -187,7 +187,6 @@ class IMUCh(object):
 
             #Check if robot on slop and ground slop starts to be flat self.count_stand += 1
             if (self.slop == 1 ) and (abs(self.pitch_avg) > 0.61) :
-                print 'count_stand:',self.count_stand
                 self.count_stand += 1
             #Check if groung is flat i.e. self. count_stand >= 2 ===> Stand up
             if self.count_stand >=2 and (abs(self.pitch_avg)) > 0.61:

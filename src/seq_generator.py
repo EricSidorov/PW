@@ -16,7 +16,7 @@ class PW_seq():
         self.count_tottal = 0
         self.count_tipping = 0
 
-        self.BaseHipZ = 0.3
+        self.BaseHipZ = 0.2
         
         ##################################################################
         ###################### Basic Standing Pose #######################
@@ -67,8 +67,8 @@ class PW_seq():
         self.SitDwnSeq1[19] = 0.1
         self.SitDwnSeq1[19+6] = -0.1
         self.SitDwnSeq1[20] = self.SitDwnSeq1[20+6] = 1.5
-        self.SitDwnSeq1[21] = 0.8
-        self.SitDwnSeq1[21+6] = -0.8
+        self.SitDwnSeq1[21] = 0.
+        self.SitDwnSeq1[21+6] = -0.
 
         self.SitDwnSeq2 = copy(self.SitDwnSeq1)
         self.SitDwnSeq2[1] = 0.5
@@ -76,6 +76,8 @@ class PW_seq():
         self.SitDwnSeq2[7] = self.SitDwnSeq2[7+6] = 2.0
         self.SitDwnSeq2[9] = -self.BaseHipZ/2
         self.SitDwnSeq2[9+6] = self.BaseHipZ/2
+        self.SitDwnSeq1[21] = 0.8
+        self.SitDwnSeq1[21+6] = -0.8
 
         ##################################################################
         ################# Crab Forward Walking Sequence ##################
@@ -132,7 +134,7 @@ class PW_seq():
         ThisRobotCnfg = copy(self.RobotCnfg[2][:])
         ThisRobotCnfg[1] = 0.5
         ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.65
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.2
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.3
         ThisRobotCnfg[17] = -1.35
         ThisRobotCnfg[17+6] = 1.35
         ThisRobotCnfg[19] = 0.25
@@ -149,15 +151,15 @@ class PW_seq():
         ThisRobotCnfg = copy(self.RobotCnfg[3][:])
         ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.2
         ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.1
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.0
         ThisRobotCnfg[17] = -1.1
         ThisRobotCnfg[17+6] = 1.1
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 0.85
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 3.0
         ThisRobotCnfg[19] = 0.05
         ThisRobotCnfg[19+6] = -0.05
-        ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 1.5
-        ThisRobotCnfg[21] = 0.3
-        ThisRobotCnfg[21+6] = -0.3
+        ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 1.1
+        ThisRobotCnfg[21] = 0.6
+        ThisRobotCnfg[21+6] = -0.6
         self.RobotCnfg.append(ThisRobotCnfg)
         self.StepDur.append(0.3*T)
 
@@ -170,7 +172,7 @@ class PW_seq():
         self.StepDur2 = []
 
         # Sequence Step 1: Move pelvis back, between arms
-        ThisRobotCnfg = copy(self.SitDwnSeq1)
+        ThisRobotCnfg = copy(self.SitDwnSeq2)
         ThisRobotCnfg[1] = 0.5
         ThisRobotCnfg[4] = self.BaseHipZ
         ThisRobotCnfg[4+6] = -self.BaseHipZ
@@ -190,7 +192,7 @@ class PW_seq():
         self.StepDur2.append(1*T)#was 0.7*T
 
         # Sequence Step 2: Bring pelvis down to the ground and lift arms
-        ThisRobotCnfg = copy(self.SitDwnSeq1)
+        ThisRobotCnfg = copy(self.SitDwnSeq2)
         ThisRobotCnfg[1] = 0.5
         ThisRobotCnfg[4] = self.BaseHipZ
         ThisRobotCnfg[4+6] = -self.BaseHipZ
@@ -200,7 +202,7 @@ class PW_seq():
         ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.5
         ThisRobotCnfg[17] = -0.2#-0.6
         ThisRobotCnfg[17+6] = 0.2#0.6
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.0
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.9
         ThisRobotCnfg[19] = 1.8
         ThisRobotCnfg[19+6] = -1.8
         ThisRobotCnfg[21] = -0.5
