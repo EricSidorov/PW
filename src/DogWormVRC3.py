@@ -213,7 +213,7 @@ class DW_Controller(object):
                 Parameters.append(MotionType)
 
             if Command.find(self.Commands[9][0]) == 0: ################ RESET ###############
-                if Command.find(self.Commands[8][0]) > 0: ########## RESET POSE #############
+                if Command.find(self.Commands[8][0]) == 0: ########## RESET POSE #############
                     MotionType = 8
                 else:
                     MotionType = 9
@@ -565,8 +565,8 @@ class DW_Controller(object):
         # self.JC.set_gains("l_leg_lax",50,0,5,set_default = False)
         # self.JC.set_gains("r_leg_lax",50,0,5,set_default = False)
         self.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq2,T*0.2,0.005)
-        self.JC.set_gains("l_arm_mwx",400,0,10)
-        self.JC.set_gains("r_arm_mwx",400,0,10)
+        self.JC.set_gains("l_arm_mwx",1200,0,10)
+        self.JC.set_gains("r_arm_mwx",1200,0,10)
         # self.JC.send_command()
         # rospy.sleep(T*0.2)
 

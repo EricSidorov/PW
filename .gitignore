@@ -8,3 +8,5 @@ src/PW
 *__.py
 *.pyc
 seqs.yaml
+*.log
+*~
