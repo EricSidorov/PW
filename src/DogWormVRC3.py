@@ -114,7 +114,9 @@ class DW_Controller(object):
                          ['terrain [MUD/HILLS/OTHER]','Sets the terrain that the robot is moving on'],
                          ['frknee [value]','Defines the knee extension during the fast rotation sequence (use values of 0 to 1)'],
                          ['gravity [x] [y] [z]','Sets the gravity vector. Default is [0] [0] [-9.81]'],
+                         ['gravec [yaw] [pitch] [mag = 9.81]','Sets the gravity vector by yaw from X, pitch from Z and magnitude'],
                          ['status','Shows the status of all the system\'s flags'],
+                         ['test [n]','Runs test number [n]'],
                          ['commands','Shows the list of all available commands'],
                          ['help [command]','Provides help on using a command'],
                          ['exit','Exit this console']]
@@ -321,7 +323,32 @@ class DW_Controller(object):
                 self.set_g_srv(req)
                 print("Set gravity vector to: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2]))
 
-            if Command.find(self.Commands[20][0]) == 0: ########### STATUS ###########
+            String = self.Commands[20][0].partition("[")[0]
+            if Command.find(String) == 0: ############### GRAVEC ###############
+                MotionType = -1
+                GVector = Command.split(" ")
+                req = SetGRequest()
+
+                if len(GVector) == 3:
+                    gy = float(GVector[1])
+                    gp = float(GVector[2])
+                    g = 9.81
+                else:
+                    gy = float(GVector[1])
+                    gp = float(GVector[2])
+                    g = float(GVector[3])
+
+                self.Gravity[0] = g*math.sin(gp)*math.cos(gy)
+                self.Gravity[1] = g*math.sin(gp)*math.sin(gy)
+                self.Gravity[2] = -g*math.cos(gp)
+
+                req.g_vec.x = float(self.Gravity[0])
+                req.g_vec.y = float(self.Gravity[1])
+                req.g_vec.z = float(self.Gravity[2])
+                self.set_g_srv(req)
+                print("Set gravity vector to: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2]))
+
+            if Command.find(self.Commands[21][0]) == 0: ########### STATUS ###########
                 MotionType = -1
                 if self.FollowPath == 0:
                     print "Bearing feedback is now OFF"
@@ -338,8 +365,23 @@ class DW_Controller(object):
                 for k, v in self.Throttle.iteritems():
                     String += ("%s %.2f, " % (k,v))
                 print String[:-2]
+                y,p,r = self.current_ypr()
+                R,P,Y = self.RS._orientation.GetRPY()
+                print("The robot\'s orientation is: Yaw = %.2f(%.2f), Pitch = %.2f(%.2f), Roll = %.2f(%.2f)" % (y,Y,p,P,r,R))
 
-            if Command.find(self.Commands[21][0]) == 0: ########### COMMANDS ###########
+            String = self.Commands[22][0].partition("[")[0]
+            if Command.find(String) == 0: ################ TEST ################
+                MotionType = -1
+                Parameters.append(MotionType)
+                CommParted = Command.partition(String)
+                TestID = int(CommParted[2])
+                print("Running test number %d..." % TestID)
+                if TestID == 1:
+                    self.Test1()
+                if TestID == 2:
+                    self.Test2()
+
+            if Command.find(self.Commands[23][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
                 print "Available commands:"
                 com_string = ""
@@ -347,7 +389,7 @@ class DW_Controller(object):
                     com_string += com[0]+", "
                 print com_string[0:-2]
 
-            String = self.Commands[22][0].partition("[")[0]
+            String = self.Commands[24][0].partition("[")[0]
             if Command.find(String) == 0: ########### HELP ###########
                 MotionType = -1
                 CommParted = Command.partition(String)
@@ -535,9 +577,9 @@ class DW_Controller(object):
 
     def reset(self):
         self.reset_srv()
-        rospy.sleep(1)
+        rospy.sleep(1.5)
 
-        while self.GlobalPos.z<0.9 or self.GlobalPos.z>1: #or abs(self.GlobalPos.x)>0.5:
+        while self.GlobalPos.z<0.9 or self.GlobalPos.z>1 or abs(self.GlobalPos.x)>0.5:
         # while self.GlobalPos.z<0.25 or self.GlobalPos.z>0.4: #or abs(self.GlobalPos.x)>0.5:
             self.reset_srv()
             rospy.sleep(1)
@@ -1516,6 +1558,66 @@ class DW_Controller(object):
         self.RHC.set_all_pos(self.BaseHandPose)
         self.LHC.send_command()
         self.RHC.send_command()
+
+
+    def Test2(self):
+        Results = []
+
+        # Test FWD sequence going downhill
+        self._fall_count = 0
+        Slope = 0
+        while self._fall_count == 0:
+            print("Walking 10 steps FWD on slope of %.1f degrees" % Slope)
+            # Reset gravity
+            self.Interface_cb(String('gravec 0 0'))
+            # Reset robot
+            self.Interface_cb(String('reset'))
+            # Sit down
+            self.Interface_cb(String('sit'))
+            rospy.sleep(1)
+            # Apply "slope"
+            SlopeStr = ("gravec 0 %.4f" % (-Slope*math.pi/180))
+            self.Interface_cb(String(SlopeStr))
+
+            # Crawl FWD 10 steps
+            Dist = 0
+            for x in range(1,10):
+                self.Crawl()
+                rospy.sleep(0.5)
+
+                # Get distance from origin
+                NewDist = math.sqrt(self.GlobalPos.x**2+self.GlobalPos.y**2+self.GlobalPos.z**2)
+
+                self.CheckTipping()
+                if self._fall_count == 0:
+                    if self.GlobalPos.x >= 0:
+                        Dist = NewDist
+                    else:
+                        Dist = -NewDist
+
+                    if Dist<-1:
+                        self._fall_count = 1
+                        break
+                else:
+                    break
+
+                # Update gravity to accomodate drift
+                y,p,r = self.current_ypr()
+                SlopeStr = ("gravec %.4f %.4f" % (y,-Slope*math.pi/180))
+                self.Interface_cb(String(SlopeStr))
+
+            # Write down result
+            Results.append([Slope,Dist])
+
+            # Increase slope
+            Slope-=1
+        pass
+        print Results
+
+        stream = file('DownhillRes.yaml','w')        
+        yaml.dump(Results,stream)
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
 
 
 ##################################################################
