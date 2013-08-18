@@ -8,9 +8,9 @@ class PW_seq():
         ##################################################################
         self.CurSeqStep = 0
         self.CurSeqStep2 = 0
-        self.Throtle = 1
+        self.Throttle = {'FWD': 1, 'BWD': 1, 'FROT': 1, 'SROT': 1}
         self.RotFlag = 0
-        self.FollowPath = 1
+        self.FollowPath = 0
         self.DesOri = 0
 
         self.count_tottal = 0
@@ -171,6 +171,7 @@ class PW_seq():
         ##################################################################
 
         T = 1
+        PelvisHeight = 0.5
         self.RobotCnfg2 = []
         self.StepDur2 = []
 
@@ -218,6 +219,8 @@ class PW_seq():
         ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.3#1.4
         ThisRobotCnfg[17] = -0.2#-0.4#-0.2#-0.6#-0.4
         ThisRobotCnfg[17+6] = 0.2#0.4#0.2#0.6# 0.4
+        ThisRobotCnfg[17] = -0.4+0.5*PelvisHeight
+        ThisRobotCnfg[17+6] = 0.4-0.5*PelvisHeight
         ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.9
         ThisRobotCnfg[19] = 0.2
         ThisRobotCnfg[19+6] = -0.2
@@ -237,18 +240,23 @@ class PW_seq():
         ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.2
         ThisRobotCnfg[17] = -0.6#-0.4#-0.2#-0.6#-0.4
         ThisRobotCnfg[17+6] = 0.6#0.4#0.2#0.6# 0.4
+        ThisRobotCnfg[17] = -1.0+0.5*PelvisHeight
+        ThisRobotCnfg[17+6] = 1.0-0.5*PelvisHeight
         self.RobotCnfg2.append(ThisRobotCnfg)
         self.StepDur2.append(0.4*T)
 
         # Sequence Step 5: Place legs on ground and lift pelvis
         ThisRobotCnfg = copy(self.RobotCnfg2[3][:])
-        ThisRobotCnfg[1] = 0.5
+        ThisRobotCnfg[1] = 0.7-1.5*PelvisHeight
         ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -0.6
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.0
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0
+        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.1-0.5*PelvisHeight
+        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0-0.25*PelvisHeight
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.15+0.5*PelvisHeight
+        ThisRobotCnfg[17] = -0.5+0.25*PelvisHeight
+        ThisRobotCnfg[17+6] = 0.5-0.25*PelvisHeight
         ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.8
-        ThisRobotCnfg[19] = 0.4
-        ThisRobotCnfg[19+6] = -0.4
+        ThisRobotCnfg[19] = 0.8-PelvisHeight
+        ThisRobotCnfg[19+6] = -0.8+PelvisHeight
         self.RobotCnfg2.append(ThisRobotCnfg)
         self.StepDur2.append(0.4*T)
 

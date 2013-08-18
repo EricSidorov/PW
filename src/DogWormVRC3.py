@@ -34,6 +34,7 @@ from std_srvs.srv import Empty
 from IMU_monitoring import IMUCh
 # from Abstractions.Interface_tf import *
 from std_msgs.msg import String
+from GPlugin.srv import *
 
 
 class Interface_tf(object):
@@ -83,10 +84,12 @@ class DW_Controller(object):
         self.HeadPitch = 0
         self._counter = 0
         self._terrain = Terrain
-        self.RotMode = 2
+        self.RotMode = 1
+        self.FRKneeExt = 1
         self._fall_count = 0
         self.FALL_LIMIT = 3
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
+        self.set_g_srv = rospy.ServiceProxy('/SetG', SetG)
         self._stat_pub = rospy.Publisher('/PW/status',Status)
         self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
 
@@ -99,6 +102,7 @@ class DW_Controller(object):
                          ['rot [delta]','Rotate in place once with strength [delta] (+/- 1)'],
                          ['recover','Recover from tipping'],
                          ['stand','Stand up from sitting position'],
+                         ['throttle [seq] [speed]','Increase/decrease the speed of a sequence (period/throttle)'],
                          ['reset pose','Resets the robot\'s configuration to the default standing pose'],
                          ['reset','Resets the robot\'s pose and returns it to its starting position'],
                          ['reload','Reloads the sit down, fwd, and bwd sequences parameters from seq_generator.py'],
@@ -108,10 +112,14 @@ class DW_Controller(object):
                          ['befb [0/1]','Turns the bearing feedback response on [1] or off [0]'],
                          ['bedes [rad]','Sets the desired bearing for the bearing FB to [rad] radians from the x axis'],
                          ['terrain [MUD/HILLS/OTHER]','Sets the terrain that the robot is moving on'],
+                         ['frknee [value]','Defines the knee extension during the fast rotation sequence (use values of 0 to 1)'],
+                         ['gravity [x] [y] [z]','Sets the gravity vector. Default is [0] [0] [-9.81]'],
                          ['status','Shows the status of all the system\'s flags'],
                          ['commands','Shows the list of all available commands'],
                          ['help [command]','Provides help on using a command'],
                          ['exit','Exit this console']]
+
+        self.Gravity = [0,0,-9.81]
 
         ##################################################################
         ######################## Controller Gains ########################
@@ -212,18 +220,35 @@ class DW_Controller(object):
                 MotionType = 7
                 Parameters.append(MotionType)
 
-            if Command.find(self.Commands[9][0]) == 0: ################ RESET ###############
-                if Command.find(self.Commands[8][0]) == 0: ########## RESET POSE #############
+            String = self.Commands[8][0].partition("[")[0]
+            if Command.find(String) == 0: ################ THROTTLE ################
+                MotionType = -1
+                Parameters.append(MotionType)
+                CommParted = Command.partition(String)
+                CommParted2 = CommParted[2].partition(" ")
+                Sequence = CommParted2[0]
+                Throttle = float(CommParted2[2])
+                Found = 0
+                for k,v in self.Throttle.iteritems():
+                    if k == Sequence.upper():
+                        Found = 1
+                        self.Throttle[k] = Throttle
+                        print("Setting throttle for %s sequence to %.2f" % (Sequence, Throttle))
+                if Found == 0:
+                    print("No throttle value for sequence %s found" % Sequence)
+
+            if Command.find(self.Commands[10][0]) == 0: ################ RESET ###############
+                if Command.find(self.Commands[9][0]) == 0: ########## RESET POSE #############
                     MotionType = 8
                 else:
                     MotionType = 9
                 Parameters.append(MotionType)
 
-            if Command.find(self.Commands[10][0]) == 0:
+            if Command.find(self.Commands[11][0]) == 0:
                 MotionType = 10
                 Parameters.append(MotionType)
 
-            String = self.Commands[11][0].partition("[")[0]
+            String = self.Commands[12][0].partition("[")[0]
             if Command.find(String) == 0: ################ SEQ ################
                 MotionType = 11
                 Parameters.append(MotionType)
@@ -234,11 +259,11 @@ class DW_Controller(object):
                 Parameters.append(Sequence)
                 Parameters.append(SeqStep)
 
-            if Command.find(self.Commands[12][0]) == 0: ########### CLOSE HANDS ###########
+            if Command.find(self.Commands[13][0]) == 0: ########### CLOSE HANDS ###########
                 MotionType = 12
                 Parameters.append(MotionType)
 
-            String = self.Commands[13][0].partition("[")[0]
+            String = self.Commands[14][0].partition("[")[0]
             if Command.find(String) == 0: ################ HEAD ################
                 MotionType = -1
                 CommParted = Command.partition(String)
@@ -249,7 +274,7 @@ class DW_Controller(object):
                     self.HeadPitch = self.HeadPitch - float(CommParted2[2])
                 self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1],0.5,0.005)
 
-            String = self.Commands[14][0].partition("[")[0]
+            String = self.Commands[15][0].partition("[")[0]
             if Command.find(String) == 0: ################ BEFB ################
                 MotionType = -1
                 CommParted = Command.partition(String)
@@ -261,21 +286,42 @@ class DW_Controller(object):
                 else:
                     print "Bearing feedback is now ON"
 
-            String = self.Commands[15][0].partition("[")[0]
+            String = self.Commands[16][0].partition("[")[0]
             if Command.find(String) == 0: ################ BEDES ################
                 MotionType = -1
                 CommParted = Command.partition(String)
                 self.DesOri = float(CommParted[2])
                 print("Desired bearing set to: %f" % self.DesOri)
 
-            String = self.Commands[16][0].partition("[")[0]
+            String = self.Commands[17][0].partition("[")[0]
             if Command.find(String) == 0: ################ TERRAIN ################
                 MotionType = -1
                 CommParted = Command.partition(String)
                 self._terrain = CommParted[2]
                 print("Terrain type set to: %s" % self._terrain)
 
-            if Command.find(self.Commands[17][0]) == 0: ########### STATUS ###########
+            String = self.Commands[18][0].partition("[")[0]
+            if Command.find(String) == 0: ########### FR KNEE EXTENSION ###########
+                MotionType = -1
+                CommParted = Command.partition(String)
+                self.FRKneeExt = float(CommParted[2])
+                print("Knee ext. parameter for fast rotation sequence set to: %.2f" % self.FRKneeExt)
+
+            String = self.Commands[19][0].partition("[")[0]
+            if Command.find(String) == 0: ############### GRAVITY ###############
+                MotionType = -1
+                GVector = Command.split(" ")
+                req = SetGRequest()
+                self.Gravity[0] = float(GVector[1])
+                self.Gravity[1] = float(GVector[2])
+                self.Gravity[2] = float(GVector[3])
+                req.g_vec.x = float(GVector[1])
+                req.g_vec.y = float(GVector[2])
+                req.g_vec.z = float(GVector[3])
+                self.set_g_srv(req)
+                print("Set gravity vector to: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2]))
+
+            if Command.find(self.Commands[20][0]) == 0: ########### STATUS ###########
                 MotionType = -1
                 if self.FollowPath == 0:
                     print "Bearing feedback is now OFF"
@@ -287,8 +333,13 @@ class DW_Controller(object):
                     print "Rotation mode set to fast"
                 else:
                     print "Rotation mode set to slow"
+                print("Gravity vector is: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2]))
+                String = "Throttle values: "
+                for k, v in self.Throttle.iteritems():
+                    String += ("%s %.2f, " % (k,v))
+                print String[:-2]
 
-            if Command.find(self.Commands[18][0]) == 0: ########### COMMANDS ###########
+            if Command.find(self.Commands[21][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
                 print "Available commands:"
                 com_string = ""
@@ -296,7 +347,7 @@ class DW_Controller(object):
                     com_string += com[0]+", "
                 print com_string[0:-2]
 
-            String = self.Commands[19][0].partition("[")[0]
+            String = self.Commands[22][0].partition("[")[0]
             if Command.find(String) == 0: ########### HELP ###########
                 MotionType = -1
                 CommParted = Command.partition(String)
@@ -351,12 +402,14 @@ class DW_Controller(object):
                 print("Rotating fast in place %0.0f%%" % (Delta*100))
                 y0,p,r = self.current_ypr()
                 self.RotSpotSeq(Delta)
+                rospy.sleep(0.5)
                 y,p,r = self.current_ypr()
                 print("Rotated %f radians" % (self.DeltaAngle(y,y0)))                
             else:
                 print("Rotating slowly in place %0.0f%%" % (Delta*100))
                 y0,p,r = self.current_ypr()
                 self.RotOnMudSeq(Delta)
+                rospy.sleep(0.5)
                 y,p,r = self.current_ypr()
                 print("Rotated %f radians" % (self.DeltaAngle(y,y0)))    
             print("SUCCESS!!\n")
@@ -399,9 +452,11 @@ class DW_Controller(object):
             SeqStep = Parameters[2]
             print("Going to %s sequence step %d" % (Sequence, SeqStep))
             if Sequence.find("fwd") == 0:
-                self.GoToSeqStep(SeqStep)
+                self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[SeqStep],1,0.005) 
+                # self.GoToSeqStep(SeqStep)
             if Sequence.find("bwd") == 0:
-                self.GoToBackSeqStep(SeqStep)
+                self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[SeqStep],1,0.005) 
+                # self.GoToBackSeqStep(SeqStep)
             print("SUCCESS!!\n")
 
         elif MotionType == 12: ############# CLOSE HANDS ##############
@@ -429,7 +484,7 @@ class DW_Controller(object):
         self.BaseHandPose = seqs.BaseHandPose
         self.StepDur = seqs.StepDur
         self.StepDur2 = seqs.StepDur2
-        self.Throtle = seqs.Throtle
+        self.Throttle = seqs.Throttle
         self.count_tipping = seqs.count_tipping
         self.count_tottal = seqs.count_tottal
         self.BaseHipZ = seqs.BaseHipZ
@@ -573,18 +628,9 @@ class DW_Controller(object):
 
     def DoPath(self,Path):
         for Point in Path:
-            if Point[2] == "fwd":
-                self.Throtle=1
-            if Point[2] == "bwd":
-                self.Throtle=0.6
-
             self.GoToPoint(Point)
             
     def GoToPoint(self,Point):
-        if Point[2] == "fwd":
-            self.Throtle=1
-        if Point[2] == "bwd":
-            self.Throtle=0.6
         self._Point = Point
         # Calculate distance and orientation to target
         while (0 == self.GlobalPos):
@@ -743,8 +789,8 @@ class DW_Controller(object):
     
     def DoSeqStep(self): 
         print 'Doing Step seq #',self.CurSeqStep
-        #self.traj_with_impedance(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throtle,0.005) 
-        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throtle,0.005) 
+        #self.traj_with_impedance(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle,0.005) 
+        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle['FWD'],0.005) 
         self.JC.reset_gains()
         self.CurSeqStep += 1
         if self.CurSeqStep > len(self.StepDur)-1:
@@ -778,13 +824,13 @@ class DW_Controller(object):
                 self.RobotCnfg2[self.CurSeqStep2][2] = pos[2] ###### NEW ######
 
                 # pos = copy(self.RobotCnfg2[1][:])
-                # self.TimeVariantIterp(self.RS.GetJointPos(),self.RobotCnfg2[self.CurSeqStep2],self.StepDur2[self.CurSeqStep2]/self.Throtle,0.005,0)
+                # self.TimeVariantIterp(self.RS.GetJointPos(),self.RobotCnfg2[self.CurSeqStep2],self.StepDur2[self.CurSeqStep2]/self.Throttle,0.005,0)
                 # self.CurSeqStep2 += 1
                 # if self.CurSeqStep2 > 4:
                 #     self.CurSeqStep2 = 0
                 # return
 
-        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[self.CurSeqStep2],self.StepDur2[self.CurSeqStep2]/self.Throtle,0.005) 
+        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[self.CurSeqStep2],self.StepDur2[self.CurSeqStep2]/self.Throttle['BWD'],0.005) 
         self.JC.reset_gains()
         self.CurSeqStep2 += 1
         if self.CurSeqStep2 > len(self.StepDur2)-1:
@@ -964,11 +1010,15 @@ class DW_Controller(object):
 
 
     def RotSpotSeq(self,Delta):
-        # Delta of 1 gives a left rotation of approx. 0.75 radians
-        knee0 = 1.1
+        # Delta of 1 gives a left rotation of approx.:
+        # 0.95 radians for Speed = 1
+        # 0.5 radians for Speed = 0
+        Speed = self.FRKneeExt
+
+        knee0 = 1.1+(1-Speed)*0.8
         hip0 = self.BaseHipZ/2
         arm0 = 1.0
-        d_arm = 0.5
+        d_arm = 0.3+0.2*Speed
 
         # Init configuration
         pos=copy(self.RobotCnfg[2][:])
@@ -977,7 +1027,7 @@ class DW_Controller(object):
         pos[7] = pos[7+6] = knee0
         pos[8] = pos[8+6] = 0.8
         pos[9] = pos[9+6] = 0
-        pos[16] = pos[16+6] = 0.9
+        pos[16] = pos[16+6] = 0.8
         pos[17] = -arm0
         pos[17+6] = arm0
         pos[18] = pos[18+6] = 2.3
@@ -988,7 +1038,7 @@ class DW_Controller(object):
             self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.005) 
         self.RotFlag = 1
 
-        T=1.
+        T=1./self.Throttle['FROT']
         if Delta>0:
             sign = 1
             dID = 0
@@ -999,8 +1049,11 @@ class DW_Controller(object):
 
         # Lift first leg (and arm)
         pos[7+dID] = knee0-1
+        pos[17+dID] = -sign*(arm0-d_arm)
+        pos[19+dID] = sign*(0.6+d_arm)
         pos[17+6-dID] = sign*(arm0-d_arm)
         pos[19+6-dID] = -sign*(0.6+d_arm)
+        pos[18] = pos[18+6] = 2.4+0.4*(1-Speed)
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
         # Rotate first leg outwards until it touches ground
         pos[4+dID] = hip0*sign+Delta*sign*0.35
@@ -1011,11 +1064,7 @@ class DW_Controller(object):
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.24*T,0.005) 
         # Lift other leg, now all the weight is on first leg
         pos[7+dID] = knee0
-        pos[17+dID] = -sign*(arm0-d_arm)
-        pos[19+dID] = sign*(0.6+d_arm)
         pos[7+6-dID] = knee0-1
-        pos[17+6-dID] = sign*(arm0)
-        pos[19+6-dID] = -sign*(0.6)
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
         # Return first leg and torso to original configuration
         pos[4+dID] = hip0*sign
@@ -1029,6 +1078,9 @@ class DW_Controller(object):
         pos[7+6-dID] = knee0
         pos[17+dID] = -sign*(arm0)
         pos[19+dID] = sign*(0.6)
+        pos[17+6-dID] = sign*(arm0)
+        pos[19+6-dID] = -sign*(0.6)
+        pos[18] = pos[18+6] = 2.3
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
         rospy.sleep(0.1*T)
 
@@ -1046,7 +1098,7 @@ class DW_Controller(object):
             sign = -1
 
         self.RotFlag = 1
-        T=1
+        T=1/self.Throttle['SROT']
 
         # Get into starting position
         pos = copy(self.RobotCnfg2[4][:])
@@ -1085,8 +1137,8 @@ class DW_Controller(object):
         pos[0] = 0.15*Delta
         # pos[2] = 0.2*Delta
         # pos[5+dID] = 0.1+0.4*Delta
-        pos[4+dID] = sign*(0.1+0.2*Delta)
-        pos[5+dID] = 0.1+0.2*Delta
+        pos[4+dID] = sign*0.1+0.2*Delta
+        pos[5+dID] = sign*0.1+0.2*Delta
         pos[7+dID] = knee0
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.4*T,0.01)
 
@@ -1196,14 +1248,15 @@ class DW_Controller(object):
         # Extend leg and bend arm
         pos = copy(self.RobotCnfg[-1][:])
         pos[7+dID] = 0.8
-        pos[17+dID] = -sign*1.3
+        pos[16+dID] = 1.4
         pos[18+dID] = 2.6
         pos[19+dID] = sign*2.35
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.3,0.01)
 
         rospy.sleep(0.1)
 
-        # Push body by rotating arm
+        # Prepare arm to push-off
+        pos[17+dID] = 0
         pos[18+dID] = 1.2
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
 
@@ -1214,6 +1267,7 @@ class DW_Controller(object):
         pos[19+dID] = sign*0.05
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
 
+        # Return to four-legged configuration
         pos = copy(self.RobotCnfg[-1][:])
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
 
@@ -1241,9 +1295,9 @@ class DW_Controller(object):
         # "Flatten" body on ground, bend elbows
         pos = copy(self.RobotCnfg[4][:])
         pos[1] = 0
-        pos[6] = pos[6+6] = -0.4
-        pos[7] = pos[7+6] = 0.8
-        pos[8] = pos[8+6] = 0.3
+        pos[6] = pos[6+6] = -0.6
+        pos[7] = pos[7+6] = 1.4
+        pos[8] = pos[8+6] = 0.7
         pos[16] = pos[16+6] = 0
         pos[17] = 0.4
         pos[17+6] = -0.4
