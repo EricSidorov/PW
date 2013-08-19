@@ -380,6 +380,8 @@ class DW_Controller(object):
                     self.Test1()
                 if TestID == 2:
                     self.Test2()
+                if TestID == 3:
+                    self.Test3()
 
             if Command.find(self.Commands[23][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
@@ -1618,6 +1620,32 @@ class DW_Controller(object):
         yaml.dump(Results,stream)
         # Reset gravity
         self.Interface_cb(String('gravec 0 0'))
+
+    def Test3(self):
+        Results = []
+        res_file = file('TurnTest.txt','w')
+        res_str = "Rotation: {0}, Knee extention: {1}, Throttle: {2} \n"
+        throt = linspace(0.5,15,5);
+        ext = linspace(0,1,10);
+        Nturn = 10;
+        # Test FWD sequence going downhill
+        for i in throt:
+            for j in ext:
+                self.Interface_cb(String('reset'))
+                self.Interface_cb(String('sit'))
+                for k in xrange(0,Nturn):
+                    y,p,r = self.current_ypr()
+                    self.Interface_cb(String('rot 1'))
+                    rospy.sleep(0.5)                    
+                    yn,pn,rn = self.current_ypr()
+                    d_yaw = self.DeltaAngle(y,yn)
+                    res_file.write(res_str.format(d_yaw,j,i))
+        res_file.close()
+        return
+
+
+
+            
 
 
 ##################################################################

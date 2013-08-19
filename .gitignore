@@ -11,3 +11,4 @@ seqs.yaml
 *.log
 *~
 *Res.yaml
+/src/*.txt
