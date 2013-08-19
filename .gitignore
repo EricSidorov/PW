@@ -10,4 +10,4 @@ src/PW
 seqs.yaml
 *.log
 *~
-*Res.yaml
+*Res*.yaml
