@@ -35,7 +35,7 @@ from IMU_monitoring import IMUCh
 # from Abstractions.Interface_tf import *
 from std_msgs.msg import String
 from GPlugin.srv import *
-
+from sys import stdout
 
 class Interface_tf(object):
     def __init__(self):
@@ -1691,12 +1691,17 @@ class DW_Controller(object):
         Results = []
         res_file = file('TurnTest.txt','w')
         res_str = "Rotation: {0}, Knee extention: {1}, Throttle: {2} \n"
-        throt = linspace(0.5,15,5);
-        ext = linspace(0,1,10);
+        Nthrot = 5;
+        Nextent = 10;
+        throt = linspace(0.5,1.5,Nthrot);
+        ext = linspace(0,1,Nextent);
         Nturn = 10;
         # Test FWD sequence going downhill
+        n = 1
         for i in throt:
+            self.Interface_cb(String('throttle FROT %.4f' % i))
             for j in ext:
+                self.Interface_cb(String('frknee %.4f' % j))
                 self.Interface_cb(String('reset'))
                 self.Interface_cb(String('sit'))
                 for k in xrange(0,Nturn):
@@ -1706,6 +1711,9 @@ class DW_Controller(object):
                     yn,pn,rn = self.current_ypr()
                     d_yaw = self.DeltaAngle(y,yn)
                     res_file.write(res_str.format(d_yaw,j,i))
+                    stdout.write("\r done %d out of %d" % (n,Nthrot*Nextent*Nturn))
+                    stdout.flush()
+                    n = n+1
         res_file.close()
         return
 
