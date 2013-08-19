@@ -78,7 +78,7 @@ class DW_Controller(object):
         self.RS = robot_state(self._jnt_names)
         self.IMU_mon = IMUCh()
 
-        print("PW::Initialize")
+        self.Print("PW::Initialize",'system')
         self.GlobalPos = 0
         self.GlobalOri = 0
         self.HeadPitch = 0
@@ -154,7 +154,7 @@ class DW_Controller(object):
 
     def Interface_cb(self,msg):
         CommString = msg.data
-        print("COMMAND RECEIVED: %s" % CommString)
+        self.Print(("COMMAND RECEIVED: %s" % CommString),'comm_in')
         MotionType = 0
         Parameters = []
 
@@ -201,10 +201,10 @@ class DW_Controller(object):
                     CommParted2 = CommParted[2].partition(" ")
                     if CommParted2[2].find("fast") == 0:
                         self.RotMode = 1
-                        print "Rotation mode set to fast"
+                        self.Print("Rotation mode set to fast",'comm_out')
                     if CommParted2[2].find("slow") == 0:
                         self.RotMode = 2
-                        print "Rotation mode set to slow"
+                        self.Print("Rotation mode set to slow",'comm_out')
                     MotionType = -1
                 else:
                     MotionType = 5
@@ -235,9 +235,9 @@ class DW_Controller(object):
                     if k == Sequence.upper():
                         Found = 1
                         self.Throttle[k] = Throttle
-                        print("Setting throttle for %s sequence to %.2f" % (Sequence, Throttle))
+                        self.Print(("Setting throttle for %s sequence to %.2f" % (Sequence, Throttle)),'comm_out')
                 if Found == 0:
-                    print("No throttle value for sequence %s found" % Sequence)
+                    self.Print(("No throttle value for sequence %s found" % Sequence),'comm_out')
 
             if Command.find(self.Commands[10][0]) == 0: ################ RESET ###############
                 if Command.find(self.Commands[9][0]) == 0: ########## RESET POSE #############
@@ -284,30 +284,30 @@ class DW_Controller(object):
                 if self.FollowPath == 0:
                     self.AddRotation(0)
                     self.AddBackRotation(0)
-                    print "Bearing feedback is now OFF"
+                    self.Print("Bearing feedback is now OFF",'comm_out')
                 else:
-                    print "Bearing feedback is now ON"
+                    self.Print("Bearing feedback is now ON",'comm_out')
 
             String = self.Commands[16][0].partition("[")[0]
             if Command.find(String) == 0: ################ BEDES ################
                 MotionType = -1
                 CommParted = Command.partition(String)
                 self.DesOri = float(CommParted[2])
-                print("Desired bearing set to: %f" % self.DesOri)
+                self.Print(("Desired bearing set to: %f" % self.DesOri),'comm_out')
 
             String = self.Commands[17][0].partition("[")[0]
             if Command.find(String) == 0: ################ TERRAIN ################
                 MotionType = -1
                 CommParted = Command.partition(String)
                 self._terrain = CommParted[2]
-                print("Terrain type set to: %s" % self._terrain)
+                self.Print(("Terrain type set to: %s" % self._terrain),'comm_out')
 
             String = self.Commands[18][0].partition("[")[0]
             if Command.find(String) == 0: ########### FR KNEE EXTENSION ###########
                 MotionType = -1
                 CommParted = Command.partition(String)
                 self.FRKneeExt = float(CommParted[2])
-                print("Knee ext. parameter for fast rotation sequence set to: %.2f" % self.FRKneeExt)
+                self.Print(("Knee ext. parameter for fast rotation sequence set to: %.2f" % self.FRKneeExt),'comm_out')
 
             String = self.Commands[19][0].partition("[")[0]
             if Command.find(String) == 0: ############### GRAVITY ###############
@@ -321,7 +321,7 @@ class DW_Controller(object):
                 req.g_vec.y = float(GVector[2])
                 req.g_vec.z = float(GVector[3])
                 self.set_g_srv(req)
-                print("Set gravity vector to: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2]))
+                self.Print(("Set gravity vector to: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2])),'comm_out')
 
             String = self.Commands[20][0].partition("[")[0]
             if Command.find(String) == 0: ############### GRAVEC ###############
@@ -329,7 +329,7 @@ class DW_Controller(object):
                 GVector = Command.split(" ")
                 req = SetGRequest()
 
-                if len(GVector) == 3:
+                if len(GVector) == 3: # command + 2 args = 3
                     gy = float(GVector[1])
                     gp = float(GVector[2])
                     g = 9.81
@@ -346,28 +346,37 @@ class DW_Controller(object):
                 req.g_vec.y = float(self.Gravity[1])
                 req.g_vec.z = float(self.Gravity[2])
                 self.set_g_srv(req)
-                print("Set gravity vector to: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2]))
+                self.Print(("Set gravity vector to: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2])),'comm_out')
 
             if Command.find(self.Commands[21][0]) == 0: ########### STATUS ###########
+                BLUE = '\033[94m'
+                GREEN = '\033[92m'
+                RED = '\033[91m'
+                YELLOW = '\033[93m'
+                WHAT = '\033[95m'
+                END = '\033[0m'
+                # Coloring can be done with "colorama" as well, just saying...
+
                 MotionType = -1
                 if self.FollowPath == 0:
-                    print "Bearing feedback is now OFF"
+                    self.Print("Bearing feedback is now "+RED+"OFF"+END,'system1')
                 else:
-                    print "Bearing feedback is now ON"
-                    print("Desired bearing set to: %f" % self.DesOri)
-                print("Terrain type set to: %s" % self._terrain)
+                    self.Print("Bearing feedback is now "+GREEN+"ON"+END,'system1')
+                    self.Print("Desired bearing set to: "+BLUE+("%f" % self.DesOri)+END,'system1')
+                self.Print("Terrain type set to: "+BLUE+("%s" % self._terrain)+END,'system1')
                 if self.RotMode == 1:
-                    print "Rotation mode set to fast"
+                    self.Print("Rotation mode set to "+YELLOW+"fast"+END,'system1')
                 else:
-                    print "Rotation mode set to slow"
-                print("Gravity vector is: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2]))
+                    self.Print("Rotation mode set to "+BLUE+"slow"+END,'system1')
+                self.Print("Gravity vector is: "+BLUE+("(%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2]))+END,'system1')
                 String = "Throttle values: "
                 for k, v in self.Throttle.iteritems():
-                    String += ("%s %.2f, " % (k,v))
-                print String[:-2]
+                    String += WHAT+("%s " % k)+BLUE+("%.2f, " % v) # ("%s %.2f, " % (k,v)) # 
+                self.Print(String[:-2]+END,'system')
+                self.Print("The robot\'s position is: "+BLUE+("x = %.2f, y = %.2f, z = %.2f" % (self.GlobalPos.x,self.GlobalPos.y,self.GlobalPos.z))+END,'system1')
                 y,p,r = self.current_ypr()
                 R,P,Y = self.RS._orientation.GetRPY()
-                print("The robot\'s orientation is: Yaw = %.2f(%.2f), Pitch = %.2f(%.2f), Roll = %.2f(%.2f)" % (y,Y,p,P,r,R))
+                self.Print("The robot\'s orientation is: "+BLUE+("Yaw = %.2f(%.2f), Pitch = %.2f(%.2f), Roll = %.2f(%.2f)" % (y,Y,p,P,r,R))+END,'system1')
 
             String = self.Commands[22][0].partition("[")[0]
             if Command.find(String) == 0: ################ TEST ################
@@ -375,7 +384,7 @@ class DW_Controller(object):
                 Parameters.append(MotionType)
                 CommParted = Command.partition(String)
                 TestID = int(CommParted[2])
-                print("Running test number %d..." % TestID)
+                self.Print(("Running test number %d..." % TestID),'system1')
                 if TestID == 1:
                     self.Test1()
                 if TestID == 2:
@@ -385,11 +394,11 @@ class DW_Controller(object):
 
             if Command.find(self.Commands[23][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
-                print "Available commands:"
+                self.Print("Available commands:",'system1')
                 com_string = ""
                 for com in self.Commands:
                     com_string += com[0]+", "
-                print com_string[0:-2]
+                self.Print(com_string[0:-2],'system1')
 
             String = self.Commands[24][0].partition("[")[0]
             if Command.find(String) == 0: ########### HELP ###########
@@ -397,12 +406,12 @@ class DW_Controller(object):
                 CommParted = Command.partition(String)
                 for com in self.Commands:
                     if com[0].find(CommParted[2])>=0:
-                        print com[0]+" - "+com[1] 
+                        self.Print(com[0]+" - "+com[1],'system1')
             
         if MotionType == 0:
-            print("Got no command param, aborting...")
+            self.Print(("Got no command param, aborting..."),'system1')
         elif MotionType < 0:
-            print " "
+            self.Print(" ",'comm_out')
         else:
             self._stat_pub.publish(Status("Busy"))
             self.DoTask(Parameters)
@@ -414,99 +423,99 @@ class DW_Controller(object):
         rospy.sleep(0.1)
 
         if MotionType == 1: ################ SIT ################
-            print("Sitting down...")
+            self.Print("Sitting down...",'comm_out')
             self.Sit(1.5)
-            print("SUCCESS!!\n")
+            self.Print("SUCCESS!!\n",'comm_out')
 
         elif MotionType == 2: ################ FWD ################
             NumSteps = Parameters[1]
-            print("Crawling FWD %d steps..." % NumSteps)
+            self.Print("Crawling FWD %d steps..." % NumSteps,'comm_out')
             for x in range(NumSteps):
                 self.Crawl()
-            print("SUCCESS!!\n")
+            self.Print("SUCCESS!!\n",'comm_out')
 
         elif MotionType == 3: ################ BWD ################
             NumSteps = Parameters[1]
-            print("Crawling BWD %d steps..." % NumSteps)
+            self.Print("Crawling BWD %d steps..." % NumSteps,'comm_out')
             for x in range(NumSteps):
                 self.BackCrawl()
-            print("SUCCESS!!\n")
+            self.Print("SUCCESS!!\n",'comm_out')
 
         elif MotionType == 4: ################ TURN ################
             Bearing = Parameters[1]
-            print("Rotating to a bearig of %f radians..." % Bearing)
+            self.Print("Rotating to a bearig of %f radians..." % Bearing,'comm_out')
             if self.RotateToOri(Bearing):
-                print("SUCCESS!!\n")
+                self.Print("SUCCESS!!\n",'comm_out')
             else:
-                print("FAIL\n")
+                self.Print("FAIL\n",'comm_out')
 
         elif MotionType == 5: ########### SINGLE ROTATE ############
             Delta = Parameters[1]
             if self.RotMode == 1:
-                print("Rotating fast in place %0.0f%%" % (Delta*100))
+                self.Print("Rotating fast in place %0.0f%%" % (Delta*100),'comm_out')
                 y0,p,r = self.current_ypr()
                 self.RotSpotSeq(Delta)
                 rospy.sleep(0.5)
                 y,p,r = self.current_ypr()
-                print("Rotated %f radians" % (self.DeltaAngle(y,y0)))                
+                self.Print("Rotated %f radians" % (self.DeltaAngle(y,y0)),'comm_out')                
             else:
-                print("Rotating slowly in place %0.0f%%" % (Delta*100))
+                self.Print("Rotating slowly in place %0.0f%%" % (Delta*100),'comm_out')
                 y0,p,r = self.current_ypr()
                 self.RotOnMudSeq(Delta)
                 rospy.sleep(0.5)
                 y,p,r = self.current_ypr()
-                print("Rotated %f radians" % (self.DeltaAngle(y,y0)))    
-            print("SUCCESS!!\n")
+                self.Print("Rotated %f radians" % (self.DeltaAngle(y,y0)),'comm_out')    
+            self.Print("SUCCESS!!\n",'comm_out')
 
         elif MotionType == 6: ################ RECOVER ################
-            print("Recovering after tipping...")
+            self.Print("Recovering after tipping...",'comm_out')
             if self.CheckTipping():
-                print("SUCCESS!!\n")
+                self.Print("SUCCESS!!\n",'comm_out')
             else:
-                print("FAIL\n")
+                self.Print("FAIL\n",'comm_out')
 
         elif MotionType == 7: ################ STANDUP ################
-            print("Standing up...")
+            self.Print("Standing up...",'comm_out')
             self.StandUp()
-            print("SUCCESS!!\n")
+            self.Print("SUCCESS!!\n",'comm_out')
 
         elif MotionType == 8: ################ RESET (POSE) ################
-            print("Resetting...")
+            self.Print("Resetting...",'comm_out')
             self.LoadPoses()
             self.JC.reset_gains()
             self.send_pos_traj(self.RS.GetJointPos(),self.BasStndPose,0.5,0.005)
-            print("SUCCESS!!\n")
+            self.Print("SUCCESS!!\n",'comm_out')
 
         elif MotionType == 9: ################ RESET (FULL) ################
-            print("Resetting...")
+            self.Print("Resetting...",'comm_out')
             self.LoadPoses()
             self.JC.reset_gains()
             self.send_pos_traj(self.RS.GetJointPos(),self.BasStndPose,0.5,0.005)
             rospy.sleep(0.5)
             self.reset()
-            print("SUCCESS!!\n")
+            self.Print("SUCCESS!!\n",'comm_out')
 
         elif MotionType == 10: ################ RELOAD ################
-            print("Loading new gaits...")
+            self.Print("Loading new gaits...",'comm_out')
             self.LoadPoses()
-            print("SUCCESS!!\n")
+            self.Print("SUCCESS!!\n",'comm_out')
 
         elif MotionType == 11: ################ SEQUENCE ################
             Sequence = Parameters[1]
             SeqStep = Parameters[2]
-            print("Going to %s sequence step %d" % (Sequence, SeqStep))
+            self.Print("Going to %s sequence step %d" % (Sequence, SeqStep),'comm_out')
             if Sequence.find("fwd") == 0:
                 self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[SeqStep],1,0.005) 
                 # self.GoToSeqStep(SeqStep)
             if Sequence.find("bwd") == 0:
                 self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[SeqStep],1,0.005) 
                 # self.GoToBackSeqStep(SeqStep)
-            print("SUCCESS!!\n")
+            self.Print("SUCCESS!!\n",'comm_out')
 
         elif MotionType == 12: ############# CLOSE HANDS ##############
-            print("Closing hands...")
+            self.Print("Closing hands...",'comm_out')
             self.CloseHands()
-            print("SUCCESS!!\n")
+            self.Print("SUCCESS!!\n",'comm_out')
 
         self._stat_pub.publish(Status("Free"))
                
@@ -517,6 +526,7 @@ class DW_Controller(object):
 
     def LoadPoses(self):
         execfile("seq_generator.py")
+        self.Print('sequence yaml generated','poses')
         seq_file = file('seqs.yaml','r')
         seqs = yaml.load(seq_file)
         self.RotFlag = seqs.RotFlag
@@ -530,7 +540,7 @@ class DW_Controller(object):
         self.StepDur2 = seqs.StepDur2
         self.Throttle = seqs.Throttle
         self.count_tipping = seqs.count_tipping
-        self.count_tottal = seqs.count_tottal
+        self.count_total = seqs.count_total
         self.BaseHipZ = seqs.BaseHipZ
         self.CurSeqStep = seqs.CurSeqStep
         self.CurSeqStep2 = seqs.CurSeqStep2
@@ -546,7 +556,6 @@ class DW_Controller(object):
 
     def Odom_cb(self,msg):
         if 1000 <= self._counter: 
-            # print ("Odom_cb::", self.GlobalPos)
             self._counter = 0
         self._counter += 1
         # self.GlobalPos = msg.pose.pose.pose.position # from C25_GlobalPosition
@@ -578,13 +587,26 @@ class DW_Controller(object):
 
 
     def reset(self):
-        self.reset_srv()
-        rospy.sleep(1.5)
-
-        while self.GlobalPos.z<0.9 or self.GlobalPos.z>1 or abs(self.GlobalPos.x)>0.5:
-        # while self.GlobalPos.z<0.25 or self.GlobalPos.z>0.4: #or abs(self.GlobalPos.x)>0.5:
+        Distance = 1
+        Try = 1
+        while Distance > 0.03:
+            self.Print("Reset try number %d" % Try,'debug1')
             self.reset_srv()
-            rospy.sleep(1)
+            rospy.sleep(0.5)
+
+            COMDist = (self.GlobalPos.x-0)**2+(self.GlobalPos.y-0)**2+(self.GlobalPos.z-0.92)**2
+            joints = self.RS.GetJointPos()
+            BackDist = joints[0]**2+joints[1]**2+joints[2]**2
+            Distance = math.sqrt(COMDist+20*BackDist)
+
+            Try += 1
+            if Try > 5:
+                self.Interface_cb(String('gravec 0 0 -0.5'))
+                rospy.sleep(0.5)
+                self.Interface_cb(String('gravec 0 0'))
+                self.reset_srv()
+                rospy.sleep(0.5)
+                Try = 1
 
 
     def current_ypr(self):
@@ -635,7 +657,7 @@ class DW_Controller(object):
                 rospy.sleep(dt)
 
         else:
-            print 'position command legth doest fit'
+            self.Print('position command length doest fit','debug2')
 
 
     def Sit(self,T):
@@ -679,7 +701,7 @@ class DW_Controller(object):
         # Calculate distance and orientation to target
         while (0 == self.GlobalPos):
             rospy.sleep(1)
-            print("Waiting for GlobalPos")
+            self.Print("Waiting for GlobalPos",'system')
         DeltaPos = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
         Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
 
@@ -706,8 +728,8 @@ class DW_Controller(object):
 
     def PerformStep(self):
         result = False
-        self.count_tottal +=1
-        print 'Total_count:', self.count_tottal
+        self.count_total +=1
+        self.Print(('Total_count:', self.count_total),'debug1')
         # Calculate distance and orientation to target
         DeltaPos = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
         Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
@@ -717,7 +739,7 @@ class DW_Controller(object):
             T_ori += math.pi
 
         if Distance<0.8:
-            print "Reached Waypoint"
+            self.Print("Reached Waypoint",system2)
             result = True
         else:
             y,p,r = self.current_ypr()
@@ -743,7 +765,7 @@ class DW_Controller(object):
                 if self._terrain !='MUD':
                     if abs(Distance2-Distance)<0.1:
                         self._stuck_counter+=1
-                        print 'stuck... D=',(Distance2-Distance)
+                        self.Print(('stuck... D=',(Distance2-Distance)),'system2')
                         if self._stuck_counter >= 2:
                             #dont follow path
                             self.FollowPath = 0
@@ -768,9 +790,8 @@ class DW_Controller(object):
         if self.FollowPath == 1:
             # Update sequence to correct orientation
             y,p,r = self.current_ypr()
-            print("Bearing: %f" % y)
             Correction = self.DeltaAngle(self.DesOri,y)
-            print("Bearing: %f, DesOri: %f, Coorection = %f" % (y,self.DesOri,Correction))
+            self.Print("Bearing: %f, DesOri: %f, Coorection = %f" % (y,self.DesOri,Correction),'debug1')
 
             Delta = Correction/0.2
             if abs(Delta)>1:
@@ -779,7 +800,7 @@ class DW_Controller(object):
             self.AddRotation(Delta)
 
         if self.RotFlag == 1:
-            print "Getting ready"
+            self.Print("Getting ready",'debug2')
             self.RotFlag = 2
             self.CurSeqStep = 0
             self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],0.5,0.005)
@@ -832,7 +853,7 @@ class DW_Controller(object):
 
     
     def DoSeqStep(self): 
-        print 'Doing Step seq #',self.CurSeqStep
+        self.Print(('Doing Step seq #',self.CurSeqStep),'debug2')
         #self.traj_with_impedance(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle,0.005) 
         self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle['FWD'],0.005) 
         self.JC.reset_gains()
@@ -857,9 +878,9 @@ class DW_Controller(object):
                     self.JC.set_gains('l_arm_ely',3000,0,10,set_default= False)
                     self.JC.set_gains('r_arm_ely',1000,0,10,set_default= False)
 
-                print 'second_contact:',self.IMU_mon.second_contact   
+                self.Print(('second_contact:',self.IMU_mon.second_contact),'debug1')
 
-            print 'Doing inv. Step seq #',self.CurSeqStep2
+            self.Print(('Doing inv. Step seq #',self.CurSeqStep2),'debug2')
 
             if self.CurSeqStep2 == 1 or self.CurSeqStep2 == 2:
                 pos = list(self.RS.GetJointPos())
@@ -958,7 +979,7 @@ class DW_Controller(object):
 
             icount = 0
             while abs(Angle)>0.3:#0.15: # Error of 9 degrees
-                print 'Delta: ',Angle,'Bearing: ',Bearing, 'yaw: ',y0
+                self.Print(('Delta: ',Angle,'Bearing: ',Bearing, 'yaw: ',y0),'debug1')
                 Delta = Angle/0.75
                 if abs(Delta)>1:
                     Delta/=abs(Delta)
@@ -980,7 +1001,7 @@ class DW_Controller(object):
                         # Robot isn't turning, try RotateInMud
                         return self.RotateToOriInMud(Bearing)
                     else:
-                        print("Rotation failed, attempt %d" % icount)
+                        self.Print("Rotation failed, attempt %d" % icount,'debug1')
 
                 y0 = y
                 Angle=self.DeltaAngle(Bearing,y0)
@@ -1015,9 +1036,8 @@ class DW_Controller(object):
         # Get current orientation
         y0,p,r = self.current_ypr()
         Angle=self.DeltaAngle(Bearing,y0)
-        # print 'Angle: ',Angle
         while abs(Angle)>0.1: # Error of 3 degrees
-            print 'MUD Delta: ',Angle,'Bearing: ',Bearing, 'yaw: ',y0
+            self.Print(('MUD Delta: ',Angle,'Bearing: ',Bearing, 'yaw: ',y0),'debug1')
             Delta = Angle/0.45
             if abs(Delta)>1:
                 Delta/=abs(Delta)
@@ -1238,14 +1258,14 @@ class DW_Controller(object):
             # R,P,Y = self.RS.GetIMU()
             R,P,Y = self.RS._orientation.GetRPY()
 
-            print 'Check Tipping r=',r,"R=",R,"p=",p,"P=",P
+            self.Print(('Check Tipping r=',r,"R=",R,"p=",p,"P=",P),'debug1')
             # if abs(p)>0.4*math.pi or abs(r)>0.8*math.pi:
             if  P>=0.8:
-                # print "Front recovery"
+                self.Print("Front recovery",'debug1')
                 result = self.FrontTipRecovery()
             elif abs(p)>0.4*math.pi or abs(r)>0.8*math.pi:
                 # Robot tipped backwards
-                # print "Back recovery"
+                self.Print("Back recovery",'debug1')
                 result = self.BackTipRecovery()
                 self.CurSeqStep2 = 0########
                 self.CurSeqStep = 0###############
@@ -1255,13 +1275,13 @@ class DW_Controller(object):
                 result = self.TipRecovery("right")
                 self.CurSeqStep2 = 0########
                 self.CurSeqStep = 0###############
-                # print "Right recovery"
+                self.Print("Right recovery",'debug1')
             elif r<-math.pi/4:
                 # Robot tipped to the left
                 result = self.TipRecovery("left")
                 self.CurSeqStep2 = 0########
                 self.CurSeqStep = 0###############
-                # print "Left recovery"
+                self.Print("Left recovery",'debug1')
             else:
                 result = 1
                 # self.FollowPath = 1
@@ -1271,7 +1291,7 @@ class DW_Controller(object):
 
     def TipRecovery(self,side):
         self.count_tipping += 1
-        print 'Tipping:', self.count_tipping
+        self.Print(('Tipping:', self.count_tipping),'debug1')
 
         dID = 0
         sign = 1
@@ -1319,7 +1339,7 @@ class DW_Controller(object):
         R,P,Y = self.RS.GetIMU()
           
         if  P>=0.8:
-            print "Front recovery"
+            self.Print("Front recovery",'debug1')
             result = self.FrontTipRecovery()
             return result
 
@@ -1388,7 +1408,6 @@ class DW_Controller(object):
 
 
     def FrontTipRecovery(self):
-
         pos = [0, 0, 0, 0,
             0, 0, -0.02, 0.04, -0.02, 0,
             0, 0, -0.02, 0.04, -0.02, 0,
@@ -1536,7 +1555,6 @@ class DW_Controller(object):
 
         rospy.sleep(2)
         RPY = self.RS.GetIMU()
-        print RPY
         if abs(RPY[0])+abs(RPY[1])<0.2:
             self.SeqWithBalance(self.RS.GetJointPos(),self.BasStndPose,3,0.005,[-0.02, 0.175])
             rospy.sleep(0.8)
@@ -1552,7 +1570,7 @@ class DW_Controller(object):
             rospy.sleep(1)
             RPY = self.RS.GetIMU()
             D, R = self._iTf.TransformListener().lookupTransform('/l_foot','/pelvis',rospy.Time(0))
-            print 'roll: ',RPY[0],'pitch: ',RPY[1],'D: ',D[2]
+            self.Print(('roll: ',RPY[0],'pitch: ',RPY[1],'D: ',D[2]),'debug1')
 
 
     def CloseHands(self):
@@ -1562,14 +1580,44 @@ class DW_Controller(object):
         self.RHC.send_command()
 
 
+    def Print(self,string,orig):
+        Verbosity = 1
+
+        VerbLevels = {'system':0, 'system1':1, 'system2':2, 'comm_out':2, 'debug1':3, 'debug2':4, 'comm_in':4, 'poses':4}
+
+        if VerbLevels[orig] <= Verbosity:
+            print(string)
+
+
     def Test2(self):
         Results = []
 
-        # Test FWD sequence going downhill
+        # Test FWD sequence going up/downhill
+        Throttles = [0.5, 0.75, 1, 1.1, 1.2]
+        for thr in Throttles:
+            self.Test2Singles("FWD","DOWN",thr,Results)
+            self.Test2Singles("FWD","UP",thr,Results)
+
+        # Test BWD sequence going up/downhill
+        Throttles = [0.5, 0.75, 1, 1.25, 1.5]
+        for thr in Throttles:
+            self.Test2Singles("BWD","DOWN",thr,Results)
+            self.Test2Singles("BWD","UP",thr,Results)
+        
+        stream = file('Test2Res.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
+    def Test2Singles(self,seq,type,throttle,Results):
+        # Initialize
         self._fall_count = 0
         Slope = 0
+        self.Interface_cb(String('throttle %s %.4f' % (seq, throttle)))
+
         while self._fall_count == 0:
-            print("Walking 10 steps FWD on slope of %.1f degrees" % Slope)
+            self.Print("Walking 10 steps %s with a throttle of %0.0f%% on slope of %.1f degrees" % (seq,throttle,Slope),'system1')
             # Reset gravity
             self.Interface_cb(String('gravec 0 0'))
             # Reset robot
@@ -1581,25 +1629,41 @@ class DW_Controller(object):
             SlopeStr = ("gravec 0 %.4f" % (-Slope*math.pi/180))
             self.Interface_cb(String(SlopeStr))
 
-            # Crawl FWD 10 steps
+            # Crawl 10 steps
             Dist = 0
+            T0 = rospy.get_time()
             for x in range(1,10):
-                self.Crawl()
+                if seq == "FWD":
+                    self.Crawl()
+                elif seq == "BWD":
+                    self.BackCrawl()
+
                 rospy.sleep(0.5)
+                T1 = rospy.get_time()
 
                 # Get distance from origin
                 NewDist = math.sqrt(self.GlobalPos.x**2+self.GlobalPos.y**2+self.GlobalPos.z**2)
 
                 self.CheckTipping()
                 if self._fall_count == 0:
-                    if self.GlobalPos.x >= 0:
-                        Dist = NewDist
-                    else:
-                        Dist = -NewDist
+                    if seq == "FWD":
+                        if self.GlobalPos.x >= 0:
+                            Dist = NewDist
+                        else:
+                            Dist = -NewDist
 
-                    if Dist<-1:
-                        self._fall_count = 1
-                        break
+                        if Dist<-1:
+                            self._fall_count = 1
+                            break
+                    elif seq == "BWD":
+                        if self.GlobalPos.x <= 0:
+                            Dist = NewDist
+                        else:
+                            Dist = -NewDist
+
+                        if Dist<-1:
+                            self._fall_count = 1
+                            break
                 else:
                     break
 
@@ -1609,17 +1673,19 @@ class DW_Controller(object):
                 self.Interface_cb(String(SlopeStr))
 
             # Write down result
-            Results.append([Slope,Dist])
+            Results.append([seq,throttle,type,Slope,Dist,T1-T0,Dist/(T1-T0)])
 
             # Increase slope
-            Slope-=1
-        pass
-        print Results
-
-        stream = file('DownhillRes.yaml','w')        
-        yaml.dump(Results,stream)
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+            if seq == "FWD":
+                if type == "UP":
+                    Slope+=1
+                elif type == "DOWN":
+                    Slope-=2
+            elif seq == "BWD":
+                if type == "UP":
+                    Slope-=1
+                elif type == "DOWN":
+                    Slope+=1
 
     def Test3(self):
         Results = []
@@ -1671,7 +1737,7 @@ if __name__=='__main__':
     rospy.sleep(0.1)
 
     while True:
-        comm = raw_input("Enter command: ")
+        comm = raw_input("\033[92mEnter command: \033[0m")
 
         if comm == "Exit" or comm == "exit":
             break
@@ -1679,7 +1745,7 @@ if __name__=='__main__':
         try:
             DW.Interface_cb(String(comm))
         except KeyboardInterrupt:
-            print "Interrupting sequence..."
+            self.Print("Interrupting sequence...",'system')
             break
 
     # rospy.spin()

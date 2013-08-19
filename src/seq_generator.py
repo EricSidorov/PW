@@ -13,7 +13,7 @@ class PW_seq():
         self.FollowPath = 0
         self.DesOri = 0
 
-        self.count_tottal = 0
+        self.count_total = 0
         self.count_tipping = 0
 
         self.BaseHipZ = 0.2
@@ -263,4 +263,3 @@ class PW_seq():
 seqs = PW_seq()
 stream = file('seqs.yaml','w')        
 yaml.dump(seqs,stream)
-print 'sequence yaml generated'
