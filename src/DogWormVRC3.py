@@ -28,6 +28,7 @@ from PW.msg import Status
 from atlas_msgs.msg import AtlasState
 from math import ceil
 import yaml
+from time import strftime, gmtime
 from copy import copy
 from std_srvs.srv import Empty
 ##nedded for tests
@@ -112,7 +113,8 @@ class DW_Controller(object):
                          ['befb [0/1]','Turns the bearing feedback response on [1] or off [0]'],
                          ['bedes [rad]','Sets the desired bearing for the bearing FB to [rad] radians from the x axis'],
                          ['terrain [MUD/HILLS/OTHER]','Sets the terrain that the robot is moving on'],
-                         ['frknee [value]','Defines the knee extension during the fast rotation sequence (use values of 0 to 1)'],
+                         ['legspread [value]','Defines how much the legs are spread out in the basic quadruped position (use values between 0 and 1)'],
+                         ['frknee [value]','Defines the knee extension during the fast rotation sequence (use values between 0 and 1)'],
                          ['gravity [x] [y] [z]','Sets the gravity vector. Default is [0] [0] [-9.81]'],
                          ['gravec [yaw] [pitch] [mag = 9.81]','Sets the gravity vector by yaw from X, pitch from Z and magnitude'],
                          ['status','Shows the status of all the system\'s flags'],
@@ -246,7 +248,7 @@ class DW_Controller(object):
                     MotionType = 9
                 Parameters.append(MotionType)
 
-            if Command.find(self.Commands[11][0]) == 0:
+            if Command.find(self.Commands[11][0]) == 0: ############### RELOAD ##############
                 MotionType = 10
                 Parameters.append(MotionType)
 
@@ -303,13 +305,25 @@ class DW_Controller(object):
                 self.Print(("Terrain type set to: %s" % self._terrain),'comm_out')
 
             String = self.Commands[18][0].partition("[")[0]
+            if Command.find(String) == 0: ############## LEG SPREAD ##############
+                MotionType = -1
+                CommParted = Command.partition(String)
+
+                args = {'LegSpread':float(CommParted[2])}
+                stream = file('seqs_args.yaml','w')        
+                yaml.dump(args,stream)
+                self.LoadPoses()
+
+                self.Print(("Leg spread parameter set to: %.2f. Sequences updated." % float(CommParted[2])),'comm_out')
+
+            String = self.Commands[19][0].partition("[")[0]
             if Command.find(String) == 0: ########### FR KNEE EXTENSION ###########
                 MotionType = -1
                 CommParted = Command.partition(String)
                 self.FRKneeExt = float(CommParted[2])
                 self.Print(("Knee ext. parameter for fast rotation sequence set to: %.2f" % self.FRKneeExt),'comm_out')
 
-            String = self.Commands[19][0].partition("[")[0]
+            String = self.Commands[20][0].partition("[")[0]
             if Command.find(String) == 0: ############### GRAVITY ###############
                 MotionType = -1
                 GVector = Command.split(" ")
@@ -323,7 +337,7 @@ class DW_Controller(object):
                 self.set_g_srv(req)
                 self.Print(("Set gravity vector to: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2])),'comm_out')
 
-            String = self.Commands[20][0].partition("[")[0]
+            String = self.Commands[21][0].partition("[")[0]
             if Command.find(String) == 0: ############### GRAVEC ###############
                 MotionType = -1
                 GVector = Command.split(" ")
@@ -348,7 +362,7 @@ class DW_Controller(object):
                 self.set_g_srv(req)
                 self.Print(("Set gravity vector to: (%.2f %.2f %.2f)" % (self.Gravity[0], self.Gravity[1], self.Gravity[2])),'comm_out')
 
-            if Command.find(self.Commands[21][0]) == 0: ########### STATUS ###########
+            if Command.find(self.Commands[22][0]) == 0: ########### STATUS ###########
                 BLUE = '\033[94m'
                 GREEN = '\033[92m'
                 RED = '\033[91m'
@@ -378,7 +392,7 @@ class DW_Controller(object):
                 R,P,Y = self.RS._orientation.GetRPY()
                 self.Print("The robot\'s orientation is: "+BLUE+("Yaw = %.2f(%.2f), Pitch = %.2f(%.2f), Roll = %.2f(%.2f)" % (y,Y,p,P,r,R))+END,'system1')
 
-            String = self.Commands[22][0].partition("[")[0]
+            String = self.Commands[23][0].partition("[")[0]
             if Command.find(String) == 0: ################ TEST ################
                 MotionType = -1
                 Parameters.append(MotionType)
@@ -389,8 +403,10 @@ class DW_Controller(object):
                     self.Test1()
                 if TestID == 2:
                     self.Test2()
+                if TestID == 3:
+                    self.Test3()
 
-            if Command.find(self.Commands[23][0]) == 0: ########### COMMANDS ###########
+            if Command.find(self.Commands[24][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
                 self.Print("Available commands:",'system1')
                 com_string = ""
@@ -398,7 +414,7 @@ class DW_Controller(object):
                     com_string += com[0]+", "
                 self.Print(com_string[0:-2],'system1')
 
-            String = self.Commands[24][0].partition("[")[0]
+            String = self.Commands[25][0].partition("[")[0]
             if Command.find(String) == 0: ########### HELP ###########
                 MotionType = -1
                 CommParted = Command.partition(String)
@@ -1593,29 +1609,50 @@ class DW_Controller(object):
         # Test FWD sequence going up/downhill
         Throttles = [0.5, 0.75, 1, 1.1, 1.2]
         for thr in Throttles:
-            self.Test2Singles("FWD","DOWN",thr,Results)
-            self.Test2Singles("FWD","UP",thr,Results)
+            self.TestSingles("FWD","DOWN",thr,Results)
+            self.TestSingles("FWD","UP",thr,Results)
 
         # Test BWD sequence going up/downhill
         Throttles = [0.5, 0.75, 1, 1.25, 1.5]
         for thr in Throttles:
-            self.Test2Singles("BWD","DOWN",thr,Results)
-            self.Test2Singles("BWD","UP",thr,Results)
+            self.TestSingles("BWD","DOWN",thr,Results)
+            self.TestSingles("BWD","UP",thr,Results)
         
-        stream = file('Test2Res.yaml','w')        
+        stream = file('Test2Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
         yaml.dump(Results,stream)
 
         # Reset gravity
         self.Interface_cb(String('gravec 0 0'))
 
-    def Test2Singles(self,seq,type,throttle,Results):
+    def Test3(self):
+        Results = []
+
+        LegSpread = [0, 0.25, 0.5, 0.75, 1]
+        for ls in LegSpread:
+            self.Interface_cb(String('legspread %.2f' % ls))
+
+            # Test FWD sequence going up/downhill
+            self.TestSingles("FWD","DOWN",1,Results)
+            self.TestSingles("FWD","UP",1,Results)
+
+            # Test BWD sequence going up/downhill
+            self.TestSingles("BWD","DOWN",1,Results)
+            self.TestSingles("BWD","UP",1,Results)
+        
+        stream = file('Test3Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
+    def TestSingles(self,seq,type,throttle,Results):
         # Initialize
         self._fall_count = 0
         Slope = 0
         self.Interface_cb(String('throttle %s %.4f' % (seq, throttle)))
 
         while self._fall_count == 0:
-            self.Print("Walking 10 steps %s with a throttle of %0.0f%% on slope of %.1f degrees" % (seq,throttle,Slope),'system1')
+            self.Print("Walking 10 steps %s with a throttle of %0.0f%% on slope of %.1f degrees" % (seq,100*throttle,Slope),'system1')
             # Reset gravity
             self.Interface_cb(String('gravec 0 0'))
             # Reset robot
@@ -1659,7 +1696,7 @@ class DW_Controller(object):
                         else:
                             Dist = -NewDist
 
-                        if Dist<-1:
+                        if Dist<0:
                             self._fall_count = 1
                             break
                 else:

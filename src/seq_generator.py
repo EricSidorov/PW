@@ -3,6 +3,9 @@ import yaml
 from copy import copy
 class PW_seq():
     def __init__(self):
+        args_file = file('seqs_args.yaml','r')
+        args = yaml.load(args_file)
+
         ##################################################################
         ######################## GAIT PARAMETERS #########################
         ##################################################################
@@ -16,7 +19,8 @@ class PW_seq():
         self.count_total = 0
         self.count_tipping = 0
 
-        self.BaseHipZ = 0.2
+        self.BaseHipZ = 0.05+args['LegSpread']*0.3
+        # self.BaseHipZ = 0.05
         
         ##################################################################
         ###################### Basic Standing Pose #######################
@@ -193,7 +197,7 @@ class PW_seq():
         ThisRobotCnfg[21] = 0
         ThisRobotCnfg[21+6] = 0
         self.RobotCnfg2.append(ThisRobotCnfg)
-        self.StepDur2.append(1*T)#was 0.7*T
+        self.StepDur2.append(0.5*T)#was 0.7*T
 
         # Sequence Step 2: Bring pelvis down to the ground and lift arms
         ThisRobotCnfg = copy(self.SitDwnSeq2)
@@ -212,7 +216,7 @@ class PW_seq():
         ThisRobotCnfg[21] = -0.5
         ThisRobotCnfg[21+6] = 0.5
         self.RobotCnfg2.append(ThisRobotCnfg)
-        self.StepDur2.append(0.3*T)
+        self.StepDur2.append(0.4*T)
 
         # Sequence Step 3: Extend arms
         ThisRobotCnfg = copy(self.RobotCnfg2[1][:])
@@ -227,7 +231,7 @@ class PW_seq():
         ThisRobotCnfg[21] = 0
         ThisRobotCnfg[21+6] = 0
         self.RobotCnfg2.append(ThisRobotCnfg)
-        self.StepDur2.append(0.3*T)
+        self.StepDur2.append(0.2*T)
 
         # Sequence Step 4: Extend torso, fall back on arms, lift and fold legs
         ThisRobotCnfg = copy(self.RobotCnfg2[2][:])
