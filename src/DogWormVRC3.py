@@ -428,6 +428,8 @@ class DW_Controller(object):
                     self.Test3()
                 if TestID == 4:
                     self.Test4()
+                if TestID == 5:
+                    self.Test5()
                 signal.alarm(int(1))
 
             if Command.find(self.Commands[24][0]) == 0: ########### COMMANDS ###########
@@ -1722,14 +1724,18 @@ class DW_Controller(object):
         # Test FWD sequence going up/downhill
         Throttles = [0.5, 0.75, 1, 1.1, 1.2]
         for thr in Throttles:
-            self.TestSingles("FWD","DOWN",thr,Results)
-            self.TestSingles("FWD","UP",thr,Results)
+            params = {'seq':"FWD", 'type':"DOWN", 'throttle':thr, 'legspread':0.5}
+            self.TestSingles(params,Results)
+            params = {'seq':"FWD", 'type':"UP", 'throttle':thr, 'legspread':0.5}
+            self.TestSingles(params,Results)
 
         # Test BWD sequence going up/downhill
         Throttles = [0.5, 0.75, 1, 1.25, 1.5]
         for thr in Throttles:
-            self.TestSingles("BWD","DOWN",thr,Results)
-            self.TestSingles("BWD","UP",thr,Results)
+            params = {'seq':"BWD", 'type':"DOWN", 'throttle':thr, 'legspread':0.5}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"UP", 'throttle':thr, 'legspread':0.5}
+            self.TestSingles(params,Results)
         
         stream = file('Test2Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
         yaml.dump(Results,stream)
@@ -1742,15 +1748,17 @@ class DW_Controller(object):
 
         LegSpread = [0, 0.25, 0.5, 0.75, 1]
         for ls in LegSpread:
-            self.Interface_cb(String('legspread %.2f' % ls))
-
             # Test FWD sequence going up/downhill
-            self.TestSingles("FWD","DOWN",1,Results)
-            self.TestSingles("FWD","UP",1,Results)
+            params = {'seq':"FWD", 'type':"DOWN", 'throttle':1, 'legspread':ls}
+            self.TestSingles(params,Results)
+            params = {'seq':"FWD", 'type':"UP", 'throttle':1, 'legspread':ls}
+            self.TestSingles(params,Results)
 
             # Test BWD sequence going up/downhill
-            self.TestSingles("BWD","DOWN",1,Results)
-            self.TestSingles("BWD","UP",1,Results)
+            params = {'seq':"BWD", 'type':"DOWN", 'throttle':1, 'legspread':ls}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"UP", 'throttle':1, 'legspread':ls}
+            self.TestSingles(params,Results)
         
         stream = file('Test3Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
         yaml.dump(Results,stream)
@@ -1758,14 +1766,92 @@ class DW_Controller(object):
         # Reset gravity
         self.Interface_cb(String('gravec 0 0'))
 
-    def TestSingles(self,seq,type,throttle,Results):
+    def Test5(self):
+        Results = []
+
+        ls = 0.5
+        th = 1
+
+        # Test fast rotation
+        params = {'seq':"FROT", 'type':"UP", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"FROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"FROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"FROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+
+        # Test slow rotation
+        params = {'seq':"SROT", 'type':"UP", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"SROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"SROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"SROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+
+        stream = file('Test5Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
+    def TestSingles(self,params,Results):
         # Initialize
+        NumSteps = 10
         self._fall_count = 0
         Slope = 0
-        self.Interface_cb(String('throttle %s %.4f' % (seq, throttle)))
+
+        # default values
+        seq = "FWD"
+        incline = "UP"
+        throttle = 1
+        legspread = 0.5
+        dyaw = 0
+        for k,v in params.iteritems():
+            if k == "seq":
+                seq = v.upper()
+                if seq.find("ROT") >= 0:
+                    # Doing rotation test
+                    NumSteps = 1
+            elif k == "type":
+                incline = v
+            elif k == "throttle":
+                throttle = v
+                self.Interface_cb(String('throttle %s %.4f' % (seq, throttle)))
+            elif k == "legspread":
+                legspread = v
+                self.Interface_cb(String('legspread %.2f' % legspread))
+
+        if seq.find("ROT") >= 0:
+            TestStr = "Rotating "
+            if seq == "SROT":
+                vel = 0
+                TestStr+="slow ("
+            elif seq == "FROT":
+                vel = 1
+                TestStr+="fast ("
+            TestStr+=("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)
+            if incline == "UP":
+                TestStr+=") inclined backwards"
+            elif incline == "DOWN":
+                dyaw = math.pi
+                TestStr+=") inclined forward"
+            elif incline == "LEFT":
+                dyaw = -math.pi/2
+                TestStr+=") inclined left"
+            elif incline == "RIGHT":
+                dyaw = math.pi/2
+                TestStr+=") inclined right"
+            dTestStr =" {} degrees"
+        else:
+            TestStr = "Crawling "+("%d" % NumSteps)+" steps "+seq+" ("+("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)+(") on a slope of %d degrees" % int(Slope))
+            dTestStr = ""
 
         while self._fall_count == 0:
-            self.Print("Walking 10 steps %s with a throttle of %0.0f%% on slope of %.1f degrees" % (seq,100*throttle,Slope),'system1')
+            self.Print(TestStr+dTestStr.format(Slope),'system1')
             # Reset gravity
             self.Interface_cb(String('gravec 0 0'))
             # Reset robot
@@ -1784,17 +1870,23 @@ class DW_Controller(object):
             rospy.sleep(1)
             # Apply "slope"
             y,p,r = self.current_ypr()
-            SlopeStr = ("gravec %.4f %.4f" % (y,-Slope*math.pi/180))
+            SlopeStr = ("gravec %.4f %.4f" % (y+dyaw,-Slope*math.pi/180))
             self.Interface_cb(String(SlopeStr))
 
-            # Crawl 10 steps
+            # Crawl/Rotate NumSteps steps
             Dist = 0
             T0 = rospy.get_time()
-            for x in range(1,10):
+            for x in range(NumSteps):
                 if seq == "FWD":
                     self.Crawl()
                 elif seq == "BWD":
                     self.BackCrawl()
+                elif seq == "SROT":
+                    self.RotOnMudSeq(1)
+                    rospy.sleep(0.5)
+                elif seq == "FROT":
+                    self.RotSpotSeq(1)
+                    rospy.sleep(0.5)
 
                 rospy.sleep(0.5)
                 T1 = rospy.get_time()
@@ -1831,19 +1923,24 @@ class DW_Controller(object):
                 self.Interface_cb(String(SlopeStr))
 
             # Write down result
-            Results.append([seq,throttle,type,Slope,Dist,T1-T0,Dist/(T1-T0)])
+            if seq.find("ROT") >= 0:
+                Results.append([seq,incline,throttle,legspread,Slope,Dist,T1-T0,Dist/(T1-T0)])
+            else:
+                Results.append([seq,incline,throttle,legspread,Slope,y,T1-T0,Dist/(T1-T0)])
 
             # Increase slope
             if seq == "FWD":
-                if type == "UP":
+                if incline == "UP":
                     Slope+=1
                 elif type == "DOWN":
-                    Slope-=2
+                    Slope-=3
             elif seq == "BWD":
-                if type == "UP":
-                    Slope-=1
+                if incline == "UP":
+                    Slope-=2
                 elif type == "DOWN":
-                    Slope+=1
+                    Slope+=2
+            elif seq.find("ROT") >= 0:
+                Slope+=2
 
     def Test1(self):
         Results = []
