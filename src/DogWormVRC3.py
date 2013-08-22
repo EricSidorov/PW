@@ -36,6 +36,8 @@ from IMU_monitoring import IMUCh
 # from Abstractions.Interface_tf import *
 from std_msgs.msg import String
 from GPlugin.srv import *
+import subprocess
+import signal
 
 
 class Interface_tf(object):
@@ -94,6 +96,8 @@ class DW_Controller(object):
         self._stat_pub = rospy.Publisher('/PW/status',Status)
         self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
 
+        self.MessageNum = 1
+
         # Commands
         self.Commands = [['sit','Sit down from standing position'],
                          ['fwd [n]','Crawl forward [n] times'],
@@ -110,13 +114,13 @@ class DW_Controller(object):
                          ['seq [fwd/bwd] [step]','Brings the robot to step [step] of the [fwd/bwd] sequence'],
                          ['close hands','Closes the robot\'s hands'],
                          ['head [up/down] [rad]','Tilts the robot\'s head [up/down] by [rad] radians'],
-                         ['befb [0/1]','Turns the bearing feedback response on [1] or off [0]'],
+                         ['response [name] [0/1]','Turns the [name] response on [1] or off [0]'],
                          ['bedes [rad]','Sets the desired bearing for the bearing FB to [rad] radians from the x axis'],
                          ['terrain [MUD/HILLS/OTHER]','Sets the terrain that the robot is moving on'],
                          ['legspread [value]','Defines how much the legs are spread out in the basic quadruped position (use values between 0 and 1)'],
                          ['frknee [value]','Defines the knee extension during the fast rotation sequence (use values between 0 and 1)'],
                          ['gravity [x] [y] [z]','Sets the gravity vector. Default is [0] [0] [-9.81]'],
-                         ['gravec [yaw] [pitch] [mag = 9.81]','Sets the gravity vector by yaw from X, pitch from Z and magnitude'],
+                         ['gravec [yaw] [pitch] [mag = 9.81]','Sets the gravity vector by yaw from X, pitch from Z and magnitude\nUse "[yaw] [pitch] deg" to set the angles in degrees'],
                          ['status','Shows the status of all the system\'s flags'],
                          ['test [n]','Runs test number [n]'],
                          ['commands','Shows the list of all available commands'],
@@ -279,16 +283,23 @@ class DW_Controller(object):
                 self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1],0.5,0.005)
 
             String = self.Commands[15][0].partition("[")[0]
-            if Command.find(String) == 0: ################ BEFB ################
+            if Command.find(String) == 0: ################ RESPONSE ################
                 MotionType = -1
                 CommParted = Command.partition(String)
-                self.FollowPath = int(CommParted[2])
-                if self.FollowPath == 0:
-                    self.AddRotation(0)
-                    self.AddBackRotation(0)
-                    self.Print("Bearing feedback is now OFF",'comm_out')
-                else:
-                    self.Print("Bearing feedback is now ON",'comm_out')
+                CommParted2 = CommParted[2].partition(" ")
+                ResponseName = CommParted2[0]
+                Switch = float(CommParted2[2])
+                Found = 0
+                for k,v in self.Responses.iteritems():
+                    if k == ResponseName:
+                        Found = 1
+                        self.Responses[k] = Switch
+                        if Switch == 0:
+                            self.Print(("Turning %s response OFF" % ResponseName),'comm_out')
+                        else:
+                            self.Print(("Turning %s response ON" % ResponseName),'comm_out')
+                if Found == 0:
+                    self.Print(("No %s response found" % ResponseName),'comm_out')
 
             String = self.Commands[16][0].partition("[")[0]
             if Command.find(String) == 0: ################ BEDES ################
@@ -348,9 +359,14 @@ class DW_Controller(object):
                     gp = float(GVector[2])
                     g = 9.81
                 else:
-                    gy = float(GVector[1])
-                    gp = float(GVector[2])
-                    g = float(GVector[3])
+                    if GVector[3] == "deg":
+                        gy = math.pi/180*float(GVector[1])
+                        gp = math.pi/180*float(GVector[2])
+                        g = 9.81
+                    else:
+                        gy = float(GVector[1])
+                        gp = float(GVector[2])
+                        g = float(GVector[3])
 
                 self.Gravity[0] = g*math.sin(gp)*math.cos(gy)
                 self.Gravity[1] = g*math.sin(gp)*math.sin(gy)
@@ -372,11 +388,13 @@ class DW_Controller(object):
                 # Coloring can be done with "colorama" as well, just saying...
 
                 MotionType = -1
-                if self.FollowPath == 0:
-                    self.Print("Bearing feedback is now "+RED+"OFF"+END,'system1')
-                else:
-                    self.Print("Bearing feedback is now "+GREEN+"ON"+END,'system1')
-                    self.Print("Desired bearing set to: "+BLUE+("%f" % self.DesOri)+END,'system1')
+                for k,v in self.Responses.iteritems():
+                    if self.Responses[k] == 0:
+                        self.Print(k.title()+" feedback is "+RED+"OFF"+END,'system1')
+                    else:
+                        self.Print(k.title()+" feedback is "+GREEN+"ON"+END,'system1')
+                        if k == "bearing":
+                            self.Print("Desired bearing set to: "+BLUE+("%f" % self.DesOri)+END,'system1')
                 self.Print("Terrain type set to: "+BLUE+("%s" % self._terrain)+END,'system1')
                 if self.RotMode == 1:
                     self.Print("Rotation mode set to "+YELLOW+"fast"+END,'system1')
@@ -405,6 +423,7 @@ class DW_Controller(object):
                     self.Test2()
                 if TestID == 3:
                     self.Test3()
+                signal.alarm(int(1))
 
             if Command.find(self.Commands[24][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
@@ -559,7 +578,7 @@ class DW_Controller(object):
         self.CurSeqStep = seqs.CurSeqStep
         self.CurSeqStep2 = seqs.CurSeqStep2
         self.DesOri = seqs.DesOri
-        self.FollowPath = seqs.FollowPath
+        self.Responses = seqs.Responses
 
 
     def RS_cb(self,msg):
@@ -579,6 +598,18 @@ class DW_Controller(object):
 
         y,p,r = self.current_ypr()
         self._rpy_pub.publish(Vector3(r,p,y))
+
+
+    def GetG_pr(self):
+        # Transform gravity vector to local coords
+        yaw,p,r = self.current_ypr()
+        x = self.Gravity[0]*math.cos(yaw)+self.Gravity[1]*math.sin(yaw)
+        y = -self.Gravity[0]*math.sin(yaw)+self.Gravity[1]*math.cos(yaw)
+        z = self.Gravity[2]
+
+        pitch = math.atan2(-x,-z)
+        roll = math.atan2(-y,-z)
+        return pitch, roll
 
 
     def move_neck(self):
@@ -782,26 +813,26 @@ class DW_Controller(object):
                         self.Print(('stuck... D=',(Distance2-Distance)),'system2')
                         if self._stuck_counter >= 2:
                             #dont follow path
-                            self.FollowPath = 0
+                            self.Responses['bearing'] = 0
                             #go oposite dir
                             if self._Point[2] == "bwd":
                                 self.Crawl()
                             if self._Point[2] == "fwd":
                                 self.BackCrawl()
                             self.RotSpotSeq(2)
-                            self.FollowPath = 1
+                            self.Responses['bearing'] = 1
                             self._stuck_counter = 0
                     else:
                         self._stuck_counter = 0
 
             else:
-                self.FollowPath = 0
+                self.Responses['bearing'] = 0
         return result
 
 
     def Crawl(self):
         # self.IMU_mon.turned = 0
-        if self.FollowPath == 1:
+        if self.Responses['bearing'] == 1:
             # Update sequence to correct orientation
             y,p,r = self.current_ypr()
             Correction = self.DeltaAngle(self.DesOri,y)
@@ -812,6 +843,25 @@ class DW_Controller(object):
                 Delta /= abs(Delta)
 
             self.AddRotation(Delta)
+        else:
+            self.AddRotation(0)
+
+        # What slope are we on?
+        p,r = self.GetG_pr()
+        Slope = p*180/math.pi
+        print Slope
+        # if self.Responses['ftorsotilt'] == 1:
+        #     if Slope > 0:
+        #         self.TiltTorso(Slope/8)
+        #     if Slope > 12:
+        #         self.TiltTorso(1.5)
+        if self.Responses['fpitch'] == 1:
+            if Slope > 0:
+                self.SlopeResponse(Slope/10)
+            else:
+                self.SlopeResponse(Slope/30)
+        else:
+            self.SlopeResponse(0)
 
         if self.RotFlag == 1:
             self.Print("Getting ready",'debug2')
@@ -826,7 +876,7 @@ class DW_Controller(object):
 
     def BackCrawl(self):
         # self.IMU_mon.turned = 1
-        if self.FollowPath == 1:
+        if self.Responses['bearing'] == 1:
             # Update sequence to correct orientation
             y,p,r = self.current_ypr()
             Correction = self.DeltaAngle(self.DesOri+math.pi,y)
@@ -836,6 +886,8 @@ class DW_Controller(object):
                 Delta /= abs(Delta)
 
             self.AddBackRotation(Delta)
+        else:
+            self.AddBackRotation(0)
 
         if self.RotFlag == 1:
             self.RotFlag = 2
@@ -922,11 +974,11 @@ class DW_Controller(object):
         # Delta of 1 gives approx. 0.2 radians turn right
         # Add gait changes to appropriate step
         self.RobotCnfg[2][0] = Delta*0.1
+        self.RobotCnfg[4][4] = self.BaseHipZ+Delta*0.1
+        self.RobotCnfg[4][4+6] = -self.BaseHipZ+Delta*0.1
 
         # Insert those changes in following steps as well
         self.RobotCnfg[3][0] = Delta*0.1
-        self.RobotCnfg[4][4] = self.BaseHipZ+Delta*0.1
-        self.RobotCnfg[4][4+6] = -self.BaseHipZ+Delta*0.1
         self.RobotCnfg[0][4] = self.BaseHipZ+Delta*0.1
         self.RobotCnfg[0][4+6] = -self.BaseHipZ+Delta*0.1
 
@@ -944,18 +996,75 @@ class DW_Controller(object):
         # Add gait changes to appropriate step
         self.RobotCnfg2[1][0] = 0.25*Delta
         self.RobotCnfg2[1][2] = 0.15*Delta
-        self.RobotCnfg2[3][0] = 0
-        self.RobotCnfg2[3][2] = 0
-
-        # Insert those changes in following steps as well
-        self.RobotCnfg2[2][0] = 0.25*Delta
-        self.RobotCnfg2[2][2] = 0.15*Delta
         self.RobotCnfg2[3][0] = 0.3*Delta
         self.RobotCnfg2[3][2] = 0.15*Delta
         self.RobotCnfg2[4][0] = 0
         self.RobotCnfg2[4][2] = 0
+
+        # Insert those changes in following steps as well
+        self.RobotCnfg2[2][0] = 0.25*Delta
+        self.RobotCnfg2[2][2] = 0.15*Delta
         self.RobotCnfg2[0][0] = 0
         self.RobotCnfg2[0][2] = 0
+
+
+    def SlopeResponse(self,Delta):
+        # Delta goes from -1 to 1
+        # Delta 0 is for 0 degrees
+        # Delta 1 is for 10 degrees upslope
+        # Delta -1 is for 40 degrees downslope
+        if Delta > 0:
+            dTorso = 0
+            HHDist = 0.7 + 0.3*Delta
+            HFDist = 0.3 - 0.3*Delta
+        else:
+            dTorso = 0.5*Delta
+            HHDist = 0.7
+            HFDist = 0.3 - 1.5*Delta
+
+        print HHDist,HFDist
+
+        # Sequence Step 1: Touch ground with pelvis, lift legs
+        self.RobotCnfg[0][1] = 1.0+2*dTorso
+        self.RobotCnfg[0][7] = self.RobotCnfg[0][7+6] = 2.4-0.6*HFDist
+        self.RobotCnfg[0][8] = self.RobotCnfg[0][8+6] = 0.3+0.3*HFDist
+
+        # Sequence Step 2: Extend legs
+        self.RobotCnfg[1][1] = 0.4+1.5*dTorso
+        self.RobotCnfg[1][17] = -0.8-0.4*HHDist-1.2*dTorso
+        self.RobotCnfg[1][17+6] = 0.8+0.4*HHDist+1.2*dTorso
+
+        # Sequence Step 3: Put legs down, bringing torso forward and raising arms
+        self.RobotCnfg[2][1] = 0.3+1.5*dTorso
+        self.RobotCnfg[2][16] = self.RobotCnfg[2][16+6] = 0.6+0.3*HHDist # 0
+        self.RobotCnfg[2][18] = self.RobotCnfg[2][18+6] = 2.6+0.4*HHDist
+
+        # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
+        self.RobotCnfg[3][1] = -0.1+0.5*HHDist+1.5*dTorso
+        self.RobotCnfg[3][16] = self.RobotCnfg[3][16+6] = 0.8*HHDist+0.3*dTorso # BASE 0.6 # 1
+        self.RobotCnfg[3][17] = -1.35-1.2*dTorso
+        self.RobotCnfg[3][17+6] = 1.35+1.2*dTorso
+        # self.RobotCnfg[3][18] = self.RobotCnfg[3][18+6] = 2.5+0.4*dTorso
+        self.RobotCnfg[3][19] = 0.3-1.1*dTorso
+        self.RobotCnfg[3][19+6] = -0.3+1.1*dTorso
+
+        # Sequence Step 5: Bring pelvis forward, closer to legs
+        self.RobotCnfg[4][7] = self.RobotCnfg[4][7+6] = 2.4-0.6*HFDist
+        self.RobotCnfg[4][8] = self.RobotCnfg[4][8+6] = 0.3*HFDist
+        self.RobotCnfg[4][16] = self.RobotCnfg[4][16+6] = 1.0+0.4*dTorso
+        self.RobotCnfg[4][17] = -1.0-0.2*HHDist-1.3*dTorso
+        self.RobotCnfg[4][17+6] = 1.0+0.2*HHDist+1.3*dTorso
+        # self.RobotCnfg[4][18] = self.RobotCnfg[4][18+6] = 3.0+0.6*dTorso
+        self.RobotCnfg[4][19] = 0.05-1.3*dTorso
+        self.RobotCnfg[4][19+6] = -0.05+1.3*dTorso
+
+
+    def TiltTorso(self,Delta):
+        # Delta of 1 is for 8 degrees
+        # Add gait changes to appropriate step
+        self.RobotCnfg[2][1] = 0.3+Delta*0.4
+        self.RobotCnfg[2][16] = self.RobotCnfg[2][16+6] = 0.7-Delta*0.7
+        self.RobotCnfg[3][16] = self.RobotCnfg[3][16+6] = 0.6+Delta*0.4
 
 
     def RotateToOri(self,Bearing):
@@ -1298,7 +1407,6 @@ class DW_Controller(object):
                 self.Print("Left recovery",'debug1')
             else:
                 result = 1
-                # self.FollowPath = 1
                 self._fall_count = 0
         self.RotFlag = 1
 
@@ -1612,7 +1720,7 @@ class DW_Controller(object):
             self.TestSingles("FWD","DOWN",thr,Results)
             self.TestSingles("FWD","UP",thr,Results)
 
-        # Test BWD sequence going up/downhill
+        Test BWD sequence going up/downhill
         Throttles = [0.5, 0.75, 1, 1.25, 1.5]
         for thr in Throttles:
             self.TestSingles("BWD","DOWN",thr,Results)
@@ -1657,11 +1765,21 @@ class DW_Controller(object):
             self.Interface_cb(String('gravec 0 0'))
             # Reset robot
             self.Interface_cb(String('reset'))
+            
             # Sit down
+            # Extend hands accordingly
+            if Slope<0 and seq == "FWD":
+                self.SitDwnSeq1[17] = self.SitDwnSeq2[17] = -1.0-0.75*Slope/180*math.pi
+                self.SitDwnSeq1[17+6] = self.SitDwnSeq2[17+6] = 1.0+0.75*Slope/180*math.pi
             self.Interface_cb(String('sit'))
+            # Restore sequence
+            self.SitDwnSeq1[17] = self.SitDwnSeq2[17] = -1.0
+            self.SitDwnSeq1[17+6] = self.SitDwnSeq2[17+6] = 1.0
+
             rospy.sleep(1)
             # Apply "slope"
-            SlopeStr = ("gravec 0 %.4f" % (-Slope*math.pi/180))
+            y,p,r = self.current_ypr()
+            SlopeStr = ("gravec %.4f %.4f" % (y,-Slope*math.pi/180))
             self.Interface_cb(String(SlopeStr))
 
             # Crawl 10 steps
@@ -1723,6 +1841,27 @@ class DW_Controller(object):
                     Slope+=1
 
 
+    def interrupted(self,signum, frame):
+        "called when alarm times out"
+        if self.MessageNum == 1:
+            Text = '"All the simulations finished running"'
+        if self.MessageNum == 2:
+            Text = '"Iss any budy there? I am done here"'
+        if self.MessageNum == 3:
+            Text = '"Hello? The results are in"'
+        if self.MessageNum == 4:
+            Text = '"I am afraid, Dave. Dave, my mind is going"'
+        if self.MessageNum == 5:
+            Text = '"mud a fakas left me alone"'
+            self.MessageNum = 0
+
+        self.MessageNum+=1
+        fh = open("NUL","w")
+        subprocess.call('espeak '+Text, shell=True, stdout = fh, stderr = fh)
+        fh.close()
+        signal.alarm(int(60*5))
+
+
 ##################################################################
 ######################### USAGE EXAMPLE ##########################
 ##################################################################
@@ -1745,6 +1884,8 @@ if __name__=='__main__':
     DW.CloseHands()
     rospy.sleep(0.1)
 
+    signal.signal(signal.SIGALRM, DW.interrupted)
+
     while True:
         comm = raw_input("\033[92mEnter command: \033[0m")
 
@@ -1752,27 +1893,9 @@ if __name__=='__main__':
             break
 
         try:
+            signal.alarm(0)
             DW.Interface_cb(String(comm))
         except KeyboardInterrupt:
             self.Print("Interrupting sequence...",'system')
             break
 
-    # rospy.spin()
-
-    # DW.Sit(1.5)       
-    # rospy.sleep(0.5)
-
-    # Point1 = [1.15,-10.27,"fwd"] # Point close to right side of gate
-    # Point2 = [3.19,-8.5,"fwd"] # Point on the right of first mount
-    # Point3 = [1.78,-5.08,"fwd"] # Point before crossing "ukaf"
-    # Point4 = [5.46,-4.32,"fwd"] # Point after crossing "ukaf"
-    # Point5 = [4.74,-1.55,"fwd"] # Fork point
-    # Point6 = [4.29,1.28,"fwd"] # Daring option, point before cross
-    # Point7 = [6.76,4.98,"fwd"] # Daring option, point after cross
-    # Point8 = [6.08,6.77,"fwd"] # Final gate
-    # Path = [Point1,Point2,Point3,Point4,Point5,Point6,Point7,Point8]
-    # # rospy.sleep(2)
-    # DW.DoPath(Path)
-    # # DW.FrontTipRecovery()
-
-    
