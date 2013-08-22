@@ -992,6 +992,7 @@ class DW_Controller(object):
 
         if abs(Delta)>1:
             Delta = Delta/abs(Delta)
+        print Delta
 
         # Add gait changes to appropriate step
         self.RobotCnfg2[1][0] = 0.25*Delta
@@ -1720,7 +1721,7 @@ class DW_Controller(object):
             self.TestSingles("FWD","DOWN",thr,Results)
             self.TestSingles("FWD","UP",thr,Results)
 
-        Test BWD sequence going up/downhill
+        # Test BWD sequence going up/downhill
         Throttles = [0.5, 0.75, 1, 1.25, 1.5]
         for thr in Throttles:
             self.TestSingles("BWD","DOWN",thr,Results)
@@ -1765,7 +1766,7 @@ class DW_Controller(object):
             self.Interface_cb(String('gravec 0 0'))
             # Reset robot
             self.Interface_cb(String('reset'))
-            
+
             # Sit down
             # Extend hands accordingly
             if Slope<0 and seq == "FWD":
