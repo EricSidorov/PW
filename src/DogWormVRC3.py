@@ -1928,23 +1928,23 @@ class DW_Controller(object):
                         if Dist<0:
                             self._fall_count = 1
                             break
-                    elif seq.find("ROT") >= 0:
-                        if y<0:
-                            self._fall_count = 1
-                            break
                 else:
                     break
 
                 # Update gravity to accomodate drift
                 y,p,r = self.current_ypr()
+                if seq.find("ROT") >= 0:
+                    if y<0:
+                        self._fall_count = 1
+                        break
                 SlopeStr = ("gravec %.4f %.4f" % (y,-Slope*math.pi/180))
                 self.Interface_cb(String(SlopeStr))
 
             # Write down result
             if seq.find("ROT") >= 0:
-                Results.append([seq,incline,throttle,legspread,Slope,Dist,T1-T0,Dist/(T1-T0)])
-            else:
                 Results.append([seq,incline,throttle,legspread,Slope,y,T1-T0,Dist/(T1-T0)])
+            else:
+                Results.append([seq,incline,throttle,legspread,Slope,Dist,T1-T0,Dist/(T1-T0)])
 
             # Increase slope
             if seq == "FWD":
