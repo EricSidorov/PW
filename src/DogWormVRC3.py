@@ -36,6 +36,7 @@ from IMU_monitoring import IMUCh
 from std_msgs.msg import String
 from GPlugin.srv import *
 from sys import stdout
+from FricPlugin.srv import *
 
 class Interface_tf(object):
     def __init__(self):
@@ -90,6 +91,7 @@ class DW_Controller(object):
         self.FALL_LIMIT = 3
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
         self.set_g_srv = rospy.ServiceProxy('/SetG', SetG)
+
         self._stat_pub = rospy.Publisher('/PW/status',Status)
         self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
 
@@ -391,6 +393,8 @@ class DW_Controller(object):
                     self.Test2()
                 if TestID == 3:
                     self.Test3()
+                if TestID == 4:
+                    self.Test4()
 
             if Command.find(self.Commands[23][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
@@ -1717,7 +1721,66 @@ class DW_Controller(object):
         res_file.close()
         return
 
-
+    def Test4(self):
+        set_mu_srv = rospy.ServiceProxy('/SetMu', SetFric)
+        ## Fast rotation ###
+        res_file = file('MudTurnTestFast_damp_10.txt','w')
+        res_str = "{0} {1} {2}\n"
+        Nthrot = 5;
+        Nfric = 8;
+        throt = linspace(0.5,1.5,Nthrot)
+        fric = linspace(0.1,0.8,Nfric)
+        Nturn = 10;
+        self.Interface_cb(String('frknee 0.8'))
+        self.Interface_cb(String('rot type fast'))
+        n = 1
+        print "\n Testing fast rotation \n"
+        for j in fric:
+            set_mu_srv(SetFricRequest(j,j))
+            for i in throt:
+                self.Interface_cb(String('throttle FROT %.4f' % i))
+                self.Interface_cb(String('reset'))
+                self.Interface_cb(String('sit'))
+                for k in xrange(0,Nturn):
+                    y,p,r = self.current_ypr()
+                    self.Interface_cb(String('rot 1'))
+                    rospy.sleep(0.5)                    
+                    yn,pn,rn = self.current_ypr()
+                    d_yaw = self.DeltaAngle(y,yn)
+                    res_file.write(res_str.format(j,i,d_yaw))
+                    stdout.write("\r done %d out of %d" % (n,Nthrot*Nturn*Nfric))
+                    stdout.flush()
+                    n = n+1
+        res_file.close()
+        ## Test slow rotation ###
+        print "\n Testing slow rotation \n"
+        res_file = file('MudTurnTestSlow_damp_10.txt','w')
+        res_str = "{0} {1} {2}\n"
+        Nthrot = 5;
+        Nfric = 8;
+        throt = linspace(0.5,1.5,Nthrot);
+        fric = linspace(0.1,0.8,8)
+        Nturn = 10;
+        self.Interface_cb(String('rot type slow'))
+        n = 1
+        for j in fric:
+            set_mu_srv(SetFricRequest(j,j))
+            for i in throt:
+                self.Interface_cb(String('throttle SROT %.4f' % i))
+                self.Interface_cb(String('reset'))
+                self.Interface_cb(String('sit'))
+                for k in xrange(0,Nturn):
+                    y,p,r = self.current_ypr()
+                    self.Interface_cb(String('rot 1'))
+                    rospy.sleep(0.5)                    
+                    yn,pn,rn = self.current_ypr()
+                    d_yaw = self.DeltaAngle(y,yn)
+                    res_file.write(res_str.format(j,i,d_yaw))
+                    stdout.write("\r done %d out of %d" % (n,Nthrot*Nturn*Nfric))
+                    stdout.flush()
+                    n = n+1
+        res_file.close()
+        return
 
             
 

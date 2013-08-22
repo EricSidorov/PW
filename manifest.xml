@@ -15,6 +15,8 @@
   <depend package="tf"/>
   <depend package="osrf_msgs"/>
   <depend package="C42_DRCSim2_tools"/>
-  <depend package="GPlugin"/>
+  <depend package="GPlugin"/>  
+  <depend package="FricPlugin"/>
+
 </package>
 

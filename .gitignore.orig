@@ -1,0 +1,18 @@
+
+#ROS auto-make files
+build/
+bin/
+msg_gen/
+srv_gen/
+src/PW
+*__.py
+*.pyc
+seqs.yaml
+*.log
+*~
+<<<<<<< HEAD
+*Res.yaml
+/src/*.txt
+=======
+*Res*.yaml
+>>>>>>> origin/Test2

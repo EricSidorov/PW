@@ -1,7 +1,7 @@
 <launch>
 
   <arg name="gzname" default="gazebo"/>
-  <arg name="gzworld" default="$(find PW)/worlds/vrc_task_2_simple.world"/>
+  <arg name="gzworld" default="$(find PW)/worlds/mud.world"/>
   <arg name="hand_suffix" default=""/>
 
   <!-- start gazebo with the Atlas -->

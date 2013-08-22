@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.4">
-  <world name="vrc_task_2_simple">
+  <world name="mud_world">
     <gui>
       <camera name="user_camera">
         <pose>9.523820 -48.992300 11.518500 0.000000 0.431643 2.004190</pose>
@@ -43,43 +43,20 @@
     </light>
 
     <include>
-      <uri>model://vrc_heightmap_2</uri>
-    </include>
-
-    <include>
-      <uri>model://gate</uri>
-      <name>gate_1</name>
-      <pose>0 -22 2.0 0 0 1.5707</pose>
-    </include>
-
-    <include>
-      <uri>model://gate</uri>
-      <name>gate_2</name>
-      <pose>0 -10.5 2.0 0 0 1.5707</pose>
-    </include>
-
-    <include>
-      <uri>model://gate</uri>
-      <name>gate_3</name>
-      <pose>6.0 6.5 2.0 0 0 1.5707</pose>
-    </include>
-
-
-    <include>
-      <uri>model://mud_atlas</uri>
+      <uri>model://mud_test</uri>
       <name>mud_atlas</name>
-      <pose>0.5 -16.6 -.38 0 0 0</pose>
+      <pose>0 0 0 0 0 0</pose>
     </include>
 
     <model name="mud_ground_plane">
       <static>true</static>
-      <pose>0.0 0.0 -0.59 0 0 0</pose>
+      <pose>0.0 0.0 0 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>100 100</size>
+              <size>5 5</size>
             </plane>
           </geometry>
           <surface>
@@ -96,7 +73,7 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>100 100</size>
+              <size>5 5</size>
             </plane>
           </geometry>
           <material>
@@ -108,15 +85,12 @@
           </material>
         </visual>
       </link>
+      <plugin filename="libFricPlugin.so" name="FricPlugin"/>
     </model>
 
     <include>
       <uri>model://atlas_sandia_hands</uri>
-      <!-- <pose>-3 -38 1.1 0 0 0</pose> -->
-      <!-- <pose>0 -22 1.1 0 0 1.5708</pose> --> <!-- Start from just behind mud in-slope -->
-      <!-- <pose>0 -15 0.5 0 0 -1.5708</pose> --> <!-- Start from just behind mud out-slope, facing back -->
-      <!--<pose>0 -11 1.03 0 0 3.14</pose> --><!-- Start from just after mud out-slope -->
-      <pose>0 -17 0.5 0 0 -1.5708</pose> <!--Start from mud pit-->
+      <pose>0 0 0.92 0 0 0</pose> 
     </include>
     <plugin filename="libVRCPlugin.so" name="vrc_plugin">
       <atlas>
@@ -136,6 +110,7 @@
         <coupling_relative_pose>1.17038e-05 -0.125623 0.35 -0.0412152 -1.57078 1.61199</coupling_relative_pose>
       </drc_fire_hose>
     </plugin>
+
     <plugin filename="libGPlugin.so" name="Gplugin"/>
     <!-- <plugin filename="libVRCScoringPlugin.so" name="vrc_scoring">
       <score_file>/tmp/vrc_task_2/score.log</score_file>
