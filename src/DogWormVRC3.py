@@ -90,7 +90,7 @@ class DW_Controller(object):
         self._counter = 0
         self._terrain = Terrain
         self.RotMode = 1
-        self.FRKneeExt = 1
+        self.FRKneeExt = 0.6
         self._fall_count = 0
         self.FALL_LIMIT = 3
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
@@ -417,19 +417,33 @@ class DW_Controller(object):
             if Command.find(String) == 0: ################ TEST ################
                 MotionType = -1
                 Parameters.append(MotionType)
-                CommParted = Command.partition(String)
-                TestID = int(CommParted[2])
-                self.Print(("Running test number %d..." % TestID),'system1')
-                if TestID == 1:
-                    self.Test1()
-                if TestID == 2:
-                    self.Test2()
-                if TestID == 3:
-                    self.Test3()
-                if TestID == 4:
-                    self.Test4()
-                if TestID == 5:
-                    self.Test5()
+                CommParted = Command.split(" ")
+                TestID = int(CommParted[1])
+                if len(CommParted)==3:
+                    Times = int(CommParted[2])
+                    if Times == 1:
+                        self.Print(("Running test number %d once..." % TestID),'system1')
+                    elif Times == 2:
+                        self.Print(("Running test number %d twice..." % TestID),'system1')
+                    elif Times > 2:
+                        self.Print(("Running test number %d %d times..." % (TestID,Times)),'system1')
+                    else:
+                        Times = 0
+                else:
+                    Times = 1
+                    self.Print(("Running test number %d once..." % TestID),'system1')
+
+                for x in range(Times):
+                    if TestID == 1:
+                        self.Test1()
+                    if TestID == 2:
+                        self.Test2()
+                    if TestID == 3:
+                        self.Test3()
+                    if TestID == 4:
+                        self.Test4()
+                    if TestID == 5:
+                        self.Test5()
                 signal.alarm(int(1))
 
             if Command.find(self.Commands[24][0]) == 0: ########### COMMANDS ###########
@@ -1912,6 +1926,10 @@ class DW_Controller(object):
                             Dist = -NewDist
 
                         if Dist<0:
+                            self._fall_count = 1
+                            break
+                    elif seq.find("ROT") >= 0:
+                        if y<0:
                             self._fall_count = 1
                             break
                 else:
