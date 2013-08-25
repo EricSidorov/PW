@@ -103,8 +103,8 @@ class PW_seq():
         ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.4
         ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.3
         ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.1
-        ThisRobotCnfg[17] = -0.6
-        ThisRobotCnfg[17+6] = 0.6
+        ThisRobotCnfg[17] = -0.8 # -0.6
+        ThisRobotCnfg[17+6] = 0.8 # 0.6
         ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 3.0
         ThisRobotCnfg[19] = 0.8
         ThisRobotCnfg[19+6] = -0.8

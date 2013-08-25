@@ -444,6 +444,8 @@ class DW_Controller(object):
                         self.Test4()
                     if TestID == 5:
                         self.Test5()
+                    if TestID == 6:
+                        self.Test6()
                 signal.alarm(int(1))
 
             if Command.find(self.Commands[24][0]) == 0: ########### COMMANDS ###########
@@ -1812,9 +1814,36 @@ class DW_Controller(object):
         # Reset gravity
         self.Interface_cb(String('gravec 0 0'))
 
+    def Test6(self):
+        Results = []
+
+        ls = 0.5
+        th = 1
+
+        LegSpread = [0, 0.25, 0.5, 0.75, 1]
+
+        for ls in LegSpread:
+            # Test FWD
+            params = {'seq':"FWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+            self.TestSingles(params,Results)
+            params = {'seq':"FWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+            self.TestSingles(params,Results)
+            
+            # Test BWD
+            params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+            self.TestSingles(params,Results)
+
+        stream = file('Test6Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
     def TestSingles(self,params,Results):
         # Initialize
-        NumSteps = 10
+        NumSteps = 4
         self._fall_count = 0
         Slope = 0
 
@@ -1861,8 +1890,8 @@ class DW_Controller(object):
                 TestStr+=") inclined right"
             dTestStr =" {} degrees"
         else:
-            TestStr = "Crawling "+("%d" % NumSteps)+" steps "+seq+" ("+("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)+(") on a slope of %d degrees" % int(Slope))
-            dTestStr = ""
+            TestStr = "Crawling "+("%d" % NumSteps)+" steps "+seq+" ("+("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)+(") on a slope of ")
+            dTestStr = "{} degrees"
 
         while self._fall_count == 0:
             self.Print(TestStr+dTestStr.format(Slope),'system1')
@@ -1880,6 +1909,7 @@ class DW_Controller(object):
             # Restore sequence
             self.SitDwnSeq1[17] = self.SitDwnSeq2[17] = -1.0
             self.SitDwnSeq1[17+6] = self.SitDwnSeq2[17+6] = 1.0
+            self.RotFlag = 1
 
             rospy.sleep(1)
             # Apply "slope"
@@ -1952,10 +1982,14 @@ class DW_Controller(object):
                     Slope+=1
                 elif type == "DOWN":
                     Slope-=3
+                else:
+                    Slope+=2
             elif seq == "BWD":
                 if incline == "UP":
                     Slope-=2
                 elif type == "DOWN":
+                    Slope+=2
+                else:
                     Slope+=2
             elif seq.find("ROT") >= 0:
                 Slope+=2
