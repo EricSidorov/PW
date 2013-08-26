@@ -235,7 +235,7 @@ class PW_seq():
         ##################################################################
 
         T = 1
-        PelvisHeight = 0.5
+        PelvisHeight = 0.0
         self.RobotCnfg2 = []
         self.StepDur2 = []
 

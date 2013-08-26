@@ -123,7 +123,7 @@ class DW_Controller(object):
                          ['legspread [value]','Defines how much the legs are spread out in the basic quadruped position (use values between 0 and 1)'],
                          ['frknee [value]','Defines the knee extension during the fast rotation sequence (use values between 0 and 1)'],
                          ['gravity [x] [y] [z]','Sets the gravity vector. Default is [0] [0] [-9.81]'],
-                         ['gravec [yaw] [pitch] [mag = 9.81]','Sets the gravity vector by yaw from X, pitch from Z and magnitude\nUse "[yaw] [pitch] deg" to set the angles in degrees'],
+                         ['gravec [yaw] [pitch] [mag = 9.81]','Sets the gravity vector by yaw from X, pitch from Z and magnitude\nUse "[yaw] [pitch] deg" to set the angles in degrees\nUse gravec keep to maintain the gravity orientation relative to the robot'],
                          ['status','Shows the status of all the system\'s flags'],
                          ['test [n]','Runs test number [n]'],
                          ['commands','Shows the list of all available commands'],
@@ -131,6 +131,8 @@ class DW_Controller(object):
                          ['exit','Exit this console']]
 
         self.Gravity = [0,0,-9.81]
+        self.GraVecKeep = 0
+        self.GraVec = [0,0,-9.81]
 
         ##################################################################
         ######################## Controller Gains ########################
@@ -357,19 +359,30 @@ class DW_Controller(object):
                 GVector = Command.split(" ")
                 req = SetGRequest()
 
-                if len(GVector) == 3: # command + 2 args = 3
-                    gy = float(GVector[1])
-                    gp = float(GVector[2])
+                if Command.find("keep") >= 0:
+                    self.GraVecKeep = 1
+                    GVector = GVector[2:]
+                else:
+                    GVector = GVector[1:]
+
+                if len(GVector) == 2:
+                    gy = float(GVector[0])
+                    gp = float(GVector[1])
                     g = 9.81
                 else:
-                    if GVector[3] == "deg":
-                        gy = math.pi/180*float(GVector[1])
-                        gp = math.pi/180*float(GVector[2])
+                    if GVector[2] == "deg":
+                        gy = math.pi/180*float(GVector[0])
+                        gp = math.pi/180*float(GVector[1])
                         g = 9.81
                     else:
-                        gy = float(GVector[1])
-                        gp = float(GVector[2])
-                        g = float(GVector[3])
+                        gy = float(GVector[0])
+                        gp = float(GVector[1])
+                        g = float(GVector[2])
+
+                if Command.find("keep") >= 0:
+                    self.GraVec[0] = gy
+                    self.GraVec[1] = gp
+                    self.GraVec[2] = g
 
                 self.Gravity[0] = g*math.sin(gp)*math.cos(gy)
                 self.Gravity[1] = g*math.sin(gp)*math.sin(gy)
@@ -487,6 +500,11 @@ class DW_Controller(object):
             NumSteps = Parameters[1]
             self.Print("Crawling FWD %d steps..." % NumSteps,'comm_out')
             for x in range(NumSteps):
+                if self.GraVecKeep == 1:
+                    # Update gravity to accomodate drift
+                    y,p,r = self.current_ypr()
+                    SlopeStr = ("gravec %.4f %.4f %.4f" % (self.GraVec[0]+y,self.GraVec[1],self.GraVec[2]))
+                    self.Interface_cb(String(SlopeStr))
                 self.Crawl()
             self.Print("SUCCESS!!\n",'comm_out')
 
@@ -494,6 +512,11 @@ class DW_Controller(object):
             NumSteps = Parameters[1]
             self.Print("Crawling BWD %d steps..." % NumSteps,'comm_out')
             for x in range(NumSteps):
+                if self.GraVecKeep == 1:
+                    # Update gravity to accomodate drift
+                    y,p,r = self.current_ypr()
+                    SlopeStr = ("gravec %.4f %.4f %.4f" % (self.GraVec[0]+y,self.GraVec[1],self.GraVec[2]))
+                    self.Interface_cb(String(SlopeStr))
                 self.BackCrawl()
             self.Print("SUCCESS!!\n",'comm_out')
 
@@ -762,7 +785,7 @@ class DW_Controller(object):
 
     def DoPath(self,Path):
         for Point in Path:
-            self.GoToPoint(Point)
+            # self.GoToPoint(Point)
             
     def GoToPoint(self,Point):
         self._Point = Point
@@ -783,7 +806,6 @@ class DW_Controller(object):
         # Rotate in place towards target
         if abs(self.DeltaAngle(T_ori,y))>0.1:
             self.RotateToOri(T_ori)
-
 
         # Crawl towards target
         if self._Point[2] == "fwd":
@@ -826,8 +848,7 @@ class DW_Controller(object):
                     self.RotateToOri(T_ori)
                 if Drift>1.4:
                     self.RotateToOri(T_ori)
-
-                    self.BackCrawl()
+                    # self.BackCrawl()
                 DeltaPos2 = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
                 Distance2 = math.sqrt(DeltaPos2[0]**2+DeltaPos2[1]**2)
                 if self._terrain !='MUD':
@@ -842,7 +863,7 @@ class DW_Controller(object):
                                 self.Crawl()
                             if self._Point[2] == "fwd":
                                 self.BackCrawl()
-                            self.RotSpotSeq(2)
+                            self.RotSpotSeq(1)
                             self.Responses['bearing'] = 1
                             self._stuck_counter = 0
                     else:
@@ -1890,8 +1911,13 @@ class DW_Controller(object):
                 TestStr+=") inclined right"
             dTestStr =" {} degrees"
         else:
-            TestStr = "Crawling "+("%d" % NumSteps)+" steps "+seq+" ("+("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)+(") on a slope of ")
-            dTestStr = "{} degrees"
+            TestStr = "Crawling "+("%d" % NumSteps)+" steps "+seq+" ("+("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)+") on a slope of "
+            if incline == "LEFT":
+                dyaw = -math.pi/2
+                dTestStr = "{} degrees inclined left"
+            elif incline == "RIGHT":
+                dyaw = math.pi/2
+                dTestStr = "{} degrees inclined right"
 
         while self._fall_count == 0:
             self.Print(TestStr+dTestStr.format(Slope),'system1')
@@ -1967,7 +1993,7 @@ class DW_Controller(object):
                     if y<0:
                         self._fall_count = 1
                         break
-                SlopeStr = ("gravec %.4f %.4f" % (y,-Slope*math.pi/180))
+                SlopeStr = ("gravec %.4f %.4f" % (y+dyaw,-Slope*math.pi/180))
                 self.Interface_cb(String(SlopeStr))
 
             # Write down result
