@@ -1,6 +1,49 @@
 #! /usr/bin/env python
 import yaml
 from copy import copy
+from numpy import pi
+class JointPos(object):
+    JointDict = {'back_lbz':0, 'back_mby':1, 'back_ubx':2, 'neck_ay':3,
+                           'l_leg_uhz':4, 'l_leg_mhx':5, 'l_leg_lhy':6, 'l_leg_kny':7, 'l_leg_uay':8, 'l_leg_lax':9,
+                           'r_leg_uhz':10, 'r_leg_mhx':11, 'r_leg_lhy':12, 'r_leg_kny':13, 'r_leg_uay':14, 'r_leg_lax':15,
+                           'l_arm_usy':16, 'l_arm_shx':17, 'l_arm_ely':18, 'l_arm_elx':19, 'l_arm_uwy':20, 'l_arm_mwx':21,
+                           'r_arm_usy':22, 'r_arm_shx':23, 'r_arm_ely':24, 'r_arm_elx':25, 'r_arm_uwy':26, 'r_arm_mwx':27}
+    def __init__(self):
+        self.pos = [0.0]*28
+        self.R_lim = [-pi,pi]
+        self.P_lim = [-pi,pi]
+    def set(self,pos):
+        if type(pos) == JointPos:
+            self.pos = copy(pos.pos)
+        else:   
+            if type(pos) == list and len(pos) == 28:
+                self.pos
+        else:
+            if type(pos) == dict:
+                for key in pos:
+                    if key in JointPos.JointDict:
+                        self.pos(JointPos.JointDict[key]) = pos[key]
+                    else:
+                        raise ValueError('Joint does not exist')
+        else:
+            raise TypeError
+
+    
+class Sequence(object):
+    """docstring for Sequence"""
+    def __init__(self, arg):
+        self.seq = []
+        self._length = 0
+    def add(self,pos):
+        if type(pos) == JointPos:
+            self._seq.append(pos)
+            self._length = self._length + 1
+        pass
+    def update(self,params):
+        pass
+
+
+        
 class PW_seq():
     def __init__(self):
         args_file = file('seqs_args.yaml','r')

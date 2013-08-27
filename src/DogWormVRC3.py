@@ -41,6 +41,18 @@ from FricPlugin.srv import *
 import subprocess
 import signal
 
+class Sequencer(object):
+    def __init__(self):
+        self._interp = None
+        self._seq = None
+        self._cur = 0
+        self._c
+    def load(self,seq):
+        pass
+    def advance(self,seq):
+        pass
+    def set_interp_method(self,method):
+        self._interp = method
 
 class Interface_tf(object):
     def __init__(self):
@@ -82,7 +94,7 @@ class DW_Controller(object):
         # Initialize robot state listener
         self.RS = robot_state(self._jnt_names)
         self.IMU_mon = IMUCh()
-
+        self.seq_rp_lims = {}
         self.Print("PW::Initialize",'system')
         self.GlobalPos = 0
         self.GlobalOri = 0
@@ -130,6 +142,7 @@ class DW_Controller(object):
                          ['help [command]','Provides help on using a command'],
                          ['exit','Exit this console'],
                          ['goto [x] [y] [dir]', 'go to point [x,y], dir=fwd/bwd']]
+
 
         self.Gravity = [0,0,-9.81]
         self.GraVecKeep = 0
