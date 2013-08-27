@@ -128,11 +128,14 @@ class DW_Controller(object):
                          ['test [n]','Runs test number [n]'],
                          ['commands','Shows the list of all available commands'],
                          ['help [command]','Provides help on using a command'],
-                         ['exit','Exit this console']]
+                         ['exit','Exit this console'],
+                         ['goto [x] [y] [dir]', 'go to point [x,y], dir=fwd/bwd']]
 
         self.Gravity = [0,0,-9.81]
         self.GraVecKeep = 0
         self.GraVec = [0,0,-9.81]
+
+        self._Point = []
 
         ##################################################################
         ######################## Controller Gains ########################
@@ -461,6 +464,16 @@ class DW_Controller(object):
                         self.Test6()
                 signal.alarm(int(1))
 
+            String = self.Commands[27][0].partition("[")[0]
+            if Command.find(String) == 0: ############### GO TO POINT ###############
+                point_str = Command.split(" ")[1:]
+                if len(point_str) == 3:
+                    Point = [float(point_str[0]) ,float(point_str[1]) ,point_str[2]]
+                    self.GoToPoint(Point)
+                else:
+                    self.Print(("Not enough parameters, required fields: [x] [y] [dir]..."),'system1')
+
+
             if Command.find(self.Commands[24][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
                 self.Print("Available commands:",'system1')
@@ -785,7 +798,7 @@ class DW_Controller(object):
 
     def DoPath(self,Path):
         for Point in Path:
-            # self.GoToPoint(Point)
+            pass# self.GoToPoint(Point)
             
     def GoToPoint(self,Point):
         self._Point = Point
@@ -793,31 +806,33 @@ class DW_Controller(object):
         while (0 == self.GlobalPos):
             rospy.sleep(1)
             self.Print("Waiting for GlobalPos",'system')
-        DeltaPos = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
-        Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
+        while self.PerformStep() == 'going':
+            pass
 
-        # Get current orientation
-        y,p,r = self.current_ypr()
-        T_ori = math.atan2(DeltaPos[1],DeltaPos[0])
-        self.DesOri = T_ori
-        if self._Point[2] == "bwd":
-            T_ori += math.pi
+        # DeltaPos = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
+        # Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
 
-        # Rotate in place towards target
-        if abs(self.DeltaAngle(T_ori,y))>0.1:
-            self.RotateToOri(T_ori)
+        # # Get current orientation
+        # y,p,r = self.current_ypr()
+        # T_ori = math.atan2(DeltaPos[1],DeltaPos[0])
+        # self.DesOri = T_ori
+        # if self._Point[2] == "bwd":
+        #     T_ori += math.pi
+        # # Rotate in place towards target
+        # if abs(self.DeltaAngle(T_ori,y))>0.1:
+        #     self.RotateToOri(T_ori)
 
-        # Crawl towards target
-        if self._Point[2] == "fwd":
-            self.Crawl()
-        if self._Point[2] == "bwd":
-            self.BackCrawl()
+        # # Crawl towards target
+        # if self._Point[2] == "fwd":
+        #     self.Crawl()
+        # if self._Point[2] == "bwd":
+        #     self.BackCrawl()
 
-        self._stuck_counter = 0
+        # self._stuck_counter = 0
 
 
     def PerformStep(self):
-        result = False
+        result = 'going'
         self.count_total +=1
         self.Print(('Total_count:', self.count_total),'debug1')
         # Calculate distance and orientation to target
@@ -829,11 +844,12 @@ class DW_Controller(object):
             T_ori += math.pi
 
         if Distance<0.8:
-            self.Print("Reached Waypoint",system2)
-            result = True
+            self.Print("Reached Waypoint",'system2')
+            result = 'done'
         else:
             y,p,r = self.current_ypr()
             # Check tipping
+            self.Print(('check tipping'),'debug1')
             self.CheckTipping()
 
             # Rotate in place towards target
@@ -851,26 +867,26 @@ class DW_Controller(object):
                     # self.BackCrawl()
                 DeltaPos2 = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
                 Distance2 = math.sqrt(DeltaPos2[0]**2+DeltaPos2[1]**2)
-                if self._terrain !='MUD':
-                    if abs(Distance2-Distance)<0.1:
-                        self._stuck_counter+=1
-                        self.Print(('stuck... D=',(Distance2-Distance)),'system2')
-                        if self._stuck_counter >= 2:
-                            #dont follow path
-                            self.Responses['bearing'] = 0
-                            #go oposite dir
-                            if self._Point[2] == "bwd":
-                                self.Crawl()
-                            if self._Point[2] == "fwd":
-                                self.BackCrawl()
-                            self.RotSpotSeq(1)
-                            self.Responses['bearing'] = 1
-                            self._stuck_counter = 0
-                    else:
-                        self._stuck_counter = 0
-
-            else:
-                self.Responses['bearing'] = 0
+                # if abs(Distance2-Distance)<0.1:
+                #     # self._stuck_counter+=1
+                #     # self.Print(('stuck... D=',(Distance2-Distance)),'system2')
+                #     # if self._stuck_counter >= 2:
+                #         result = 'stuck'
+                        # #dont follow path
+                        # self.Responses['bearing'] = 0
+                        # #go oposite dir
+                        # if self._Point[2] == "bwd":
+                        #     self.Crawl()
+                        # if self._Point[2] == "fwd":
+                        #     self.BackCrawl()
+                        # self.RotSpotSeq(1)
+                        # self.Responses['bearing'] = 1
+                        # self._stuck_counter = 0
+                # else:
+                #     self._stuck_counter = 0
+            # else:
+                # result = 'stuck'
+                # self.Responses['bearing'] = 0
         return result
 
 
@@ -1747,7 +1763,7 @@ class DW_Controller(object):
 
 
     def Print(self,string,orig):
-        Verbosity = 1
+        Verbosity = 3
 
         VerbLevels = {'system':0, 'system1':1, 'system2':2, 'comm_out':2, 'debug1':3, 'debug2':4, 'comm_in':4, 'poses':4}
 
