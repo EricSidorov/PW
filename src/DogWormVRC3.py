@@ -117,7 +117,7 @@ class DW_Controller(object):
                          ['seq [fwd/bwd] [step]','Brings the robot to step [step] of the [fwd/bwd] sequence'],
                          ['close hands','Closes the robot\'s hands'],
                          ['head [up/down] [rad]','Tilts the robot\'s head [up/down] by [rad] radians'],
-                         ['befb [0/1]','Turns the bearing feedback response on [1] or off [0]'],
+                         ['response [0/1]','Turns the response on [1] or off [0]'],
                          ['bedes [rad]','Sets the desired bearing for the bearing FB to [rad] radians from the x axis'],
                          ['terrain [MUD/HILLS/OTHER]','Sets the terrain that the robot is moving on'],
                          ['legspread [value]','Defines how much the legs are spread out in the basic quadruped position (use values between 0 and 1)'],
@@ -133,6 +133,7 @@ class DW_Controller(object):
         self.Gravity = [0,0,-9.81]
         self.GraVecKeep = 0
         self.GraVec = [0,0,-9.81]
+        self.Steep = 1
 
         ##################################################################
         ######################## Controller Gains ########################
@@ -181,13 +182,25 @@ class DW_Controller(object):
                 MotionType = 1
                 Parameters.append(MotionType)
 
-            String = self.Commands[1][0].partition("[")[0]
+            String = self.Commands[1][0].partition(" ")[0]
             if Command.find(String) == 0: ################ FWD ################
-                MotionType = 2
-                Parameters.append(MotionType)
-                CommParted = Command.partition(String)
-                NumSteps = int(CommParted[2])
-                Parameters.append(NumSteps)
+                CommSplit = Command.split(" ")
+                if len(CommSplit) == 1:
+                    MotionType = 2
+                    NumSteps = 1
+                    Parameters.append(MotionType)
+                    Parameters.append(NumSteps)
+                elif CommSplit[1].isdigit():
+                    MotionType = 2
+                    NumSteps = int(CommSplit[1])
+                    Parameters.append(MotionType)
+                    Parameters.append(NumSteps)
+                elif CommSplit[1] == "steep":
+                    MotionType = -1
+                    self.Steep = 1
+                elif CommSplit[1] == "nosteep":
+                    MotionType = -1
+                    self.Steep = 0
 
             String = self.Commands[2][0].partition("[")[0]
             if Command.find(String) == 0: ################ BWD ################
@@ -584,7 +597,10 @@ class DW_Controller(object):
             SeqStep = Parameters[2]
             self.Print("Going to %s sequence step %d" % (Sequence, SeqStep),'comm_out')
             if Sequence.find("fwd") == 0:
-                self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[SeqStep],1,0.005) 
+                if self.Steep == 0:
+                    self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[SeqStep],1,0.005) 
+                else:
+                    self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg3[SeqStep],1,0.005) 
                 # self.GoToSeqStep(SeqStep)
             if Sequence.find("bwd") == 0:
                 self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[SeqStep],1,0.005) 
@@ -614,9 +630,11 @@ class DW_Controller(object):
         self.SitDwnSeq2 = seqs.SitDwnSeq2
         self.RobotCnfg = seqs.RobotCnfg
         self.RobotCnfg2 = seqs.RobotCnfg2
+        self.RobotCnfg3 = seqs.RobotCnfg3
         self.BaseHandPose = seqs.BaseHandPose
         self.StepDur = seqs.StepDur
         self.StepDur2 = seqs.StepDur2
+        self.StepDur3 = seqs.StepDur3
         self.Throttle = seqs.Throttle
         self.count_tipping = seqs.count_tipping
         self.count_total = seqs.count_total
@@ -785,7 +803,7 @@ class DW_Controller(object):
 
     def DoPath(self,Path):
         for Point in Path:
-            # self.GoToPoint(Point)
+            self.GoToPoint(Point)
             
     def GoToPoint(self,Point):
         self._Point = Point
@@ -893,7 +911,6 @@ class DW_Controller(object):
         # What slope are we on?
         p,r = self.GetG_pr()
         Slope = p*180/math.pi
-        print Slope
         # if self.Responses['ftorsotilt'] == 1:
         #     if Slope > 0:
         #         self.TiltTorso(Slope/8)
@@ -965,7 +982,10 @@ class DW_Controller(object):
     def DoSeqStep(self): 
         self.Print(('Doing Step seq #',self.CurSeqStep),'debug2')
         #self.traj_with_impedance(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle,0.005) 
-        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle['FWD'],0.005) 
+        if self.Steep == 0:
+            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle['FWD'],0.005) 
+        else:
+            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg3[self.CurSeqStep],self.StepDur3[self.CurSeqStep]/self.Throttle['FWD'],0.005) 
         self.JC.reset_gains()
         self.CurSeqStep += 1
         if self.CurSeqStep > len(self.StepDur)-1:
@@ -1065,8 +1085,6 @@ class DW_Controller(object):
             dTorso = 0.5*Delta
             HHDist = 0.7
             HFDist = 0.3 - 1.5*Delta
-
-        print HHDist,HFDist
 
         # Sequence Step 1: Touch ground with pelvis, lift legs
         self.RobotCnfg[0][1] = 1.0+2*dTorso
@@ -1918,6 +1936,8 @@ class DW_Controller(object):
             elif incline == "RIGHT":
                 dyaw = math.pi/2
                 dTestStr = "{} degrees inclined right"
+            else:
+                dTestStr ="{} degrees"
 
         while self._fall_count == 0:
             self.Print(TestStr+dTestStr.format(Slope),'system1')

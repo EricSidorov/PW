@@ -89,26 +89,92 @@ class PW_seq():
         self.RobotCnfg = []
         self.StepDur = []
 
-        # HHDist = 0.7
-        # HFDist = 0.3
+        # Slope should be in deg and non-positive
+        nSlope = Slope/50 # Normalized slope 0 -> -1
 
         # Sequence Step 1: Touch ground with pelvis, lift legs
         ThisRobotCnfg = copy(self.SitDwnSeq2)
-        ThisRobotCnfg[1] = 1.0
+        ThisRobotCnfg[1] = 1.0 + 0.55*nSlope # 1.0 -> 0.45
         ThisRobotCnfg[4] = 0.5
         ThisRobotCnfg[4+6] = -0.5
         ThisRobotCnfg[5] = 0.5
         ThisRobotCnfg[5+6] = -0.5
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.4
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.3
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.1
-        ThisRobotCnfg[17] = -0.8 # -0.6
-        ThisRobotCnfg[17+6] = 0.8 # 0.6
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 3.0
-        ThisRobotCnfg[19] = 0.8
-        ThisRobotCnfg[19+6] = -0.8
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75 - 0.6*nSlope # -1.75 -> -1.15
+        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.4 + 1.0*nSlope # 2.4 -> 1.4
+        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.3 - 0.2*nSlope # 0.3 -> 0.5
+        ThisRobotCnfg[9] = -self.BaseHipZ/2 * (1+nSlope) # -self.BaseHipZ/2 -> 0
+        ThisRobotCnfg[9+6] = self.BaseHipZ/2 * (1+nSlope) # -self.BaseHipZ/2 -> 0
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.1 - 0.4*nSlope # 1.1 -> 1.5
+        ThisRobotCnfg[17] = -0.8 - 1.6*nSlope # -0.8 -> 0.8
+        ThisRobotCnfg[17+6] = 0.8 + 1.6*nSlope # 0.8 -> -0.8
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 3.0 + 1.0*nSlope # 3.0 -> 2.0
+        ThisRobotCnfg[19] = 0.8 - 0.9*nSlope # 0.8 -> 1.7
+        ThisRobotCnfg[19+6] = -0.8 + 0.9*nSlope # -0.8 -> -1.7
+        ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 1.5 + 2.7*nSlope # 1.5 -> -1.2
+        self.RobotCnfg.append(ThisRobotCnfg)
+        self.StepDur.append(0.1*T)
 
+        # Sequence Step 2: Extend legs
+        ThisRobotCnfg = copy(self.RobotCnfg[0][:])
+        ThisRobotCnfg[1] = 0.4 - 0.05*nSlope # 0.45
+        ThisRobotCnfg[4] = self.BaseHipZ+(self.BaseHipZ-0.2)*nSlope # 0.2
+        ThisRobotCnfg[4+6] = -self.BaseHipZ-(self.BaseHipZ-0.2)*nSlope # -0.2
+        ThisRobotCnfg[5] = self.BaseHipZ+(self.BaseHipZ-0.3)*nSlope # 0.3
+        ThisRobotCnfg[5+6] = -self.BaseHipZ-(self.BaseHipZ-0.3)*nSlope # -0.3
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75 - 1.05*nSlope # -0.7
+        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 0.5 - 0.1*nSlope # 0.6
+        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.7 + 0.2*nSlope # 0.5
+        self.RobotCnfg.append(ThisRobotCnfg)
+        self.StepDur.append(0.3*T)
+
+        # Sequence Step 3: Put legs down, bringing torso forward and raising arms
+        ThisRobotCnfg = copy(self.RobotCnfg[1][:])
+        ThisRobotCnfg[1] = 0.3 - 0.15*nSlope # 0.45
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75 - 1.35*nSlope # -0.4
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.7 - 0.1*nSlope # 0.8
+        ThisRobotCnfg[17] = 0 - 0.8*nSlope # 0.8
+        ThisRobotCnfg[17+6] = 0 + 0.8*nSlope # -0.8
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.7 + 0.5*nSlope # 2.2
+        ThisRobotCnfg[19] = 2.4 + 0.3*nSlope # 2.1
+        ThisRobotCnfg[19+6] = -2.4 -0.3*nSlope # -2.1
+        self.RobotCnfg.append(ThisRobotCnfg)
+        self.StepDur.append(0.2*T)
+
+        # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
+        ThisRobotCnfg = copy(self.RobotCnfg[2][:])
+        ThisRobotCnfg[1] = 0.2
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.65 - 1.45*nSlope # -0.2
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.6 - 0.2*nSlope # 0.8
+        ThisRobotCnfg[17] = -1.35 - 2.05*nSlope # 0.7
+        ThisRobotCnfg[17+6] = 1.35 + 2.05*nSlope # -0.7
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.5 - 0.3*nSlope # 2.8
+        ThisRobotCnfg[19] = 0.3 - 1.3*nSlope # 1.6
+        ThisRobotCnfg[19+6] = -0.3 + 1.3*nSlope # -1.6
+        ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 0 +1.2*nSlope # -1.2
+        self.RobotCnfg.append(ThisRobotCnfg)
+        self.StepDur.append((0.3-nSlope)*T) # 1.3*T
+
+        # Sequence Step 5: Bring pelvis forward, closer to legs
+        ThisRobotCnfg = copy(self.RobotCnfg[3][:]) 
+        ThisRobotCnfg[5] = self.BaseHipZ + (self.BaseHipZ-0.5)*nSlope # 0.5
+        ThisRobotCnfg[5+6] = -self.BaseHipZ - (self.BaseHipZ-0.5)*nSlope # -0.5
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.65 - 1.05*nSlope # -0.6
+        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.2 + 0.8*nSlope # 1.4
+        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.1 - 0.6*nSlope # 0.7
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.0 + 0.1*nSlope # 0.9
+        ThisRobotCnfg[17] = -1.0 - 2.2*nSlope # 1.2
+        ThisRobotCnfg[17+6] = 1.0 + 2.2*nSlope # -1.2
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 3.0
+        ThisRobotCnfg[19] = 0.05 - 1.65*nSlope # 1.7
+        ThisRobotCnfg[19+6] = -0.05 + 1.65*nSlope # -1.7
+        ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 1.1 + 2.6*nSlope # -1.5
+        ThisRobotCnfg[21] = 0.4 # ?
+        ThisRobotCnfg[21+6] = -0.4 # ?
+        self.RobotCnfg.append(ThisRobotCnfg)
+        self.StepDur.append(0.2*T)
+
+        # # Sequence Step 1: Touch ground with pelvis, lift legs
+        # ThisRobotCnfg = copy(self.SitDwnSeq2)
         # ThisRobotCnfg[1] = 1.0
         # ThisRobotCnfg[4] = 0.5
         # ThisRobotCnfg[4+6] = -0.5
@@ -118,29 +184,16 @@ class PW_seq():
         # ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.4
         # ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.3
         # ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.1
-        # ThisRobotCnfg[17] = -0.6
-        # ThisRobotCnfg[17+6] = 0.6
+        # ThisRobotCnfg[17] = -0.8 # -0.6
+        # ThisRobotCnfg[17+6] = 0.8 # 0.6
         # ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 3.0
         # ThisRobotCnfg[19] = 0.8
         # ThisRobotCnfg[19+6] = -0.8
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.1*T)
+        # self.RobotCnfg.append(ThisRobotCnfg)
+        # self.StepDur.append(0.1*T)
         
-        # Sequence Step 2: Extend legs
-        ThisRobotCnfg = copy(self.RobotCnfg[0][:])
-        ThisRobotCnfg[1] = 0.4
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75
-        ThisRobotCnfg[4] = self.BaseHipZ
-        ThisRobotCnfg[4+6] = -self.BaseHipZ
-        ThisRobotCnfg[5] = self.BaseHipZ
-        ThisRobotCnfg[5+6] = -self.BaseHipZ
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 0.5
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.7
-        ThisRobotCnfg[17] = -0.8 # -1.0
-        ThisRobotCnfg[17+6] = 0.8 # 1.0
-        ThisRobotCnfg[19] = 0.8 # 0.1
-        ThisRobotCnfg[19+6] = -0.8 # -0.1
-
+        # # Sequence Step 2: Extend legs
+        # ThisRobotCnfg = copy(self.RobotCnfg[0][:])
         # ThisRobotCnfg[1] = 0.4
         # ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75
         # ThisRobotCnfg[4] = self.BaseHipZ
@@ -149,93 +202,62 @@ class PW_seq():
         # ThisRobotCnfg[5+6] = -self.BaseHipZ
         # ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 0.5
         # ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.7
-        # ThisRobotCnfg[17] = -0.8
-        # ThisRobotCnfg[17+6] = 0.8
-        # ThisRobotCnfg[19] = 0.8
-        # ThisRobotCnfg[19+6] = -0.8
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.3*T)
+        # ThisRobotCnfg[17] = -0.8 # -1.0
+        # ThisRobotCnfg[17+6] = 0.8 # 1.0
+        # ThisRobotCnfg[19] = 0.8 # 0.1
+        # ThisRobotCnfg[19+6] = -0.8 # -0.1
+        # self.RobotCnfg.append(ThisRobotCnfg)
+        # self.StepDur.append(0.3*T)
 
-        # Sequence Step 3: Put legs down, bringing torso forward and raising arms
-        ThisRobotCnfg = copy(self.RobotCnfg[1][:])
-        ThisRobotCnfg[1] = 0.3
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.7
-        ThisRobotCnfg[17] = 0 # 0.2
-        ThisRobotCnfg[17+6] = 0 # -0.2
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.7
-        ThisRobotCnfg[19] = 2.4
-        ThisRobotCnfg[19+6] = -2.4
-
-        # ThisRobotCnfg[1] = 0.3 # 0.7
+        # # Sequence Step 3: Put legs down, bringing torso forward and raising arms
+        # ThisRobotCnfg = copy(self.RobotCnfg[1][:])
+        # ThisRobotCnfg[1] = 0.3
         # ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.75
-        # ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.6+0.3*HHDist # 0
+        # ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.7
         # ThisRobotCnfg[17] = 0 # 0.2
         # ThisRobotCnfg[17+6] = 0 # -0.2
-        # ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.6+0.4*HHDist
+        # ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.7
         # ThisRobotCnfg[19] = 2.4
         # ThisRobotCnfg[19+6] = -2.4
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.2*T)
+        # self.RobotCnfg.append(ThisRobotCnfg)
+        # self.StepDur.append(0.2*T)
 
-        # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
-        ThisRobotCnfg = copy(self.RobotCnfg[2][:])
-        ThisRobotCnfg[1] = 0.2 # 0.5
-        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.65
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.6
-        ThisRobotCnfg[17] = -1.35
-        ThisRobotCnfg[17+6] = 1.35
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.5 # 2.7
-        ThisRobotCnfg[19] = 0.3
-        ThisRobotCnfg[19+6] = -0.3
-        ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 0
-
-        # ThisRobotCnfg[1] = 0 # BASE 0.5
+        # # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
+        # ThisRobotCnfg = copy(self.RobotCnfg[2][:])
+        # ThisRobotCnfg[1] = 0.2 # 0.5
         # ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.65
-        # ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.0*HHDist # BASE 0.6 # 1
+        # ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.6
         # ThisRobotCnfg[17] = -1.35
         # ThisRobotCnfg[17+6] = 1.35
-        # ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.5
+        # ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.5 # 2.7
         # ThisRobotCnfg[19] = 0.3
         # ThisRobotCnfg[19+6] = -0.3
         # ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 0
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.3*T)
+        # self.RobotCnfg.append(ThisRobotCnfg)
+        # self.StepDur.append(0.3*T)
 
-        # Sequence Step 5: Bring pelvis forward, closer to legs
-        ThisRobotCnfg = copy(self.RobotCnfg[3][:])
-        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.2
-        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.1 # 0
-        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.0
-        ThisRobotCnfg[17] = -1.0
-        ThisRobotCnfg[17+6] = 1.0
-        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 3.0
-        ThisRobotCnfg[19] = 0.05
-        ThisRobotCnfg[19+6] = -0.05
-        ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 1.1
-        ThisRobotCnfg[21] = 0.4
-        ThisRobotCnfg[21+6] = -0.4
-
-        # ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.4-0.6*HFDist
-        # ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.3*HFDist
+        # # Sequence Step 5: Bring pelvis forward, closer to legs
+        # ThisRobotCnfg = copy(self.RobotCnfg[3][:])
+        # ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.2
+        # ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.1 # 0
         # ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.0
-        # ThisRobotCnfg[17] = -1.0-0.2*HHDist
-        # ThisRobotCnfg[17+6] = 1.0+0.2*HHDist
+        # ThisRobotCnfg[17] = -1.0
+        # ThisRobotCnfg[17+6] = 1.0
         # ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 3.0
         # ThisRobotCnfg[19] = 0.05
         # ThisRobotCnfg[19+6] = -0.05
         # ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 1.1
         # ThisRobotCnfg[21] = 0.4
         # ThisRobotCnfg[21+6] = -0.4
-        self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append(0.2*T)
+        # self.RobotCnfg.append(ThisRobotCnfg)
+        # self.StepDur.append(0.2*T)
 
         ##################################################################
         ################# Crab Backward Walking Sequence #################
         ##################################################################
 
         T = 1
-        PelvisHeight = 0.0
+        PelvisHeight = 1.0
         self.RobotCnfg2 = []
         self.StepDur2 = []
 
@@ -323,6 +345,87 @@ class PW_seq():
         ThisRobotCnfg[19+6] = -0.8+PelvisHeight
         self.RobotCnfg2.append(ThisRobotCnfg)
         self.StepDur2.append(0.4*T)
+
+        ##################################################################
+        #### Crab Forward Walking Sequence on steep downhill inclines ####
+        ##################################################################
+
+        T = 1.5
+        self.RobotCnfg3 = []
+        self.StepDur3 = []
+        
+        # Sequence Step 1: Touch ground with pelvis, lift legs
+        ThisRobotCnfg = copy(self.SitDwnSeq2)
+        ThisRobotCnfg[1] = 0.45
+        ThisRobotCnfg[4] = 0.5
+        ThisRobotCnfg[4+6] = -0.5
+        ThisRobotCnfg[5] = 0.5
+        ThisRobotCnfg[5+6] = -0.5
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.15
+        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 1.4
+        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.5
+        ThisRobotCnfg[9] = 0.
+        ThisRobotCnfg[9+6] = -0.
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.5
+        ThisRobotCnfg[17] = 0.8 # -0.6
+        ThisRobotCnfg[17+6] = -0.8 # 0.6
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.0
+        ThisRobotCnfg[19] = 1.7
+        ThisRobotCnfg[19+6] = -1.7
+        ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = -1.2
+        self.RobotCnfg3.append(ThisRobotCnfg)
+        self.StepDur3.append(0.1*T)
+        
+        # Sequence Step 2: Extend legs
+        ThisRobotCnfg = copy(self.RobotCnfg3[0][:])
+        ThisRobotCnfg[4] = 0.2
+        ThisRobotCnfg[4+6] = -0.2
+        ThisRobotCnfg[5] = 0.3
+        ThisRobotCnfg[5+6] = -0.3
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -0.7
+        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 0.6
+        self.RobotCnfg3.append(ThisRobotCnfg)
+        self.StepDur3.append(0.3*T)
+
+        # Sequence Step 3: Put legs down, bringing torso forward and raising arms
+        ThisRobotCnfg = copy(self.RobotCnfg3[1][:])
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -0.4
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.8
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.2
+        ThisRobotCnfg[19] = 2.1
+        ThisRobotCnfg[19+6] = -2.1
+        self.RobotCnfg3.append(ThisRobotCnfg)
+        self.StepDur3.append(0.2*T)
+
+        # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
+        ThisRobotCnfg = copy(self.RobotCnfg3[2][:])
+        ThisRobotCnfg[1] = 0.2
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -0.2
+        ThisRobotCnfg[17] = 0.7 # -0.6
+        ThisRobotCnfg[17+6] = -0.7 # 0.6
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.8
+        ThisRobotCnfg[19] = 1.6
+        ThisRobotCnfg[19+6] = -1.6
+        self.RobotCnfg3.append(ThisRobotCnfg)
+        self.StepDur3.append(0.3*T)
+
+        # Sequence Step 5: Bring pelvis forward, closer to legs
+        ThisRobotCnfg = copy(self.RobotCnfg3[3][:])        
+        ThisRobotCnfg[1] = 0.2
+        ThisRobotCnfg[5] = 0.5
+        ThisRobotCnfg[5+6] = -0.5
+        ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -0.6
+        ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 1.4
+        ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.7
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 0.9
+        ThisRobotCnfg[17] = 1.2 # -0.6
+        ThisRobotCnfg[17+6] = -1.2 # 0.6
+        ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 3.0
+        ThisRobotCnfg[19] = 1.7
+        ThisRobotCnfg[19+6] = -1.7
+        ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = -1.5
+        self.RobotCnfg3.append(ThisRobotCnfg)
+        self.StepDur3.append(0.2*T)
 
 seqs = PW_seq()
 stream = file('seqs.yaml','w')        
