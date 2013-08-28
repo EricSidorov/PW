@@ -2,9 +2,10 @@
 import yaml
 from copy import copy
 class PW_seq():
-    def __init__(self):
-        args_file = file('seqs_args.yaml','r')
-        args = yaml.load(args_file)
+    def __init__(self,args):
+        # args_file = file('seqs_args.yaml','r')
+        # args = yaml.load(args_file)
+        
 
         ##################################################################
         ######################## GAIT PARAMETERS #########################
@@ -18,7 +19,6 @@ class PW_seq():
 
         self.count_total = 0
         self.count_tipping = 0
-
         self.BaseHipZ = 0.05+args['LegSpread']*0.3
         # self.BaseHipZ = 0.05
         
@@ -257,7 +257,7 @@ class PW_seq():
         ##################################################################
 
         T = 1
-        PelvisHeight = 1.0
+        PelvisHeight = args['PelvisHeight']
         self.RobotCnfg2 = []
         self.StepDur2 = []
 
@@ -427,6 +427,6 @@ class PW_seq():
         self.RobotCnfg3.append(ThisRobotCnfg)
         self.StepDur3.append(0.2*T)
 
-seqs = PW_seq()
-stream = file('seqs.yaml','w')        
-yaml.dump(seqs,stream)
+# seqs = PW_seq()
+# stream = file('seqs.yaml','w')        
+# yaml.dump(seqs,stream)
