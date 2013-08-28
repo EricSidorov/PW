@@ -95,6 +95,7 @@ class DW_Controller(object):
         self.FALL_LIMIT = 3
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
         self.set_g_srv = rospy.ServiceProxy('/SetG', SetG)
+        self.last_seq = ""
 
         self._stat_pub = rospy.Publisher('/PW/status',Status)
         self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
@@ -425,6 +426,7 @@ class DW_Controller(object):
                     String += WHAT+("%s " % k)+BLUE+("%.2f, " % v) # ("%s %.2f, " % (k,v)) # 
                 self.Print(String[:-2]+END,'system')
                 self.Print("The robot\'s position is: "+BLUE+("x = %.2f, y = %.2f, z = %.2f" % (self.GlobalPos.x,self.GlobalPos.y,self.GlobalPos.z))+END,'system1')
+                self.Print("The robot\'s lat sequence is: "+BLUE+("%s" % self.last_seq)+END,'system1')
                 y,p,r = self.current_ypr()
                 R,P,Y = self.RS._orientation.GetRPY()
                 self.Print("The robot\'s orientation is: "+BLUE+("Yaw = %.2f(%.2f), Pitch = %.2f(%.2f), Roll = %.2f(%.2f)" % (y,Y,p,P,r,R))+END,'system1')
@@ -794,6 +796,7 @@ class DW_Controller(object):
         self.JC.set_gains("r_arm_mwx",1200,0,10)
         # self.JC.send_command()
         # rospy.sleep(T*0.2)
+        self.last_seq = "sit"
 
 
     def DoPath(self,Path):
@@ -932,6 +935,7 @@ class DW_Controller(object):
         self.GoToSeqStep(len(self.StepDur))
         rospy.sleep(0.2)
         self.RotFlag = 0
+        self.last_seq = "fwd"
 
 
     def BackCrawl(self):
@@ -952,8 +956,8 @@ class DW_Controller(object):
         if self.RotFlag == 1:
             self.RotFlag = 2
             self.GoToBackSeqStep(1)
-
         self.GoToBackSeqStep(len(self.StepDur2))
+        self.last_seq = "bwd"
 
 
     def GoToSeqStep(self,Step):
@@ -965,6 +969,7 @@ class DW_Controller(object):
                 self.DoSeqStep()
             while self.CurSeqStep != Step:
                 self.DoSeqStep()
+
 
 
     def GoToBackSeqStep(self,Step):
@@ -1134,6 +1139,7 @@ class DW_Controller(object):
             if self.RotFlag == 2:
                 self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1][:],1,0.01)
             self.RotFlag = 1
+            self.last_seq = "rot"
 
             # Make sure Bearing is from -pi to +pi
             Bearing = Bearing % (2*math.pi)
@@ -1206,7 +1212,7 @@ class DW_Controller(object):
 
     def RotateToOriInMud(self,Bearing):
         self.RotFlag = 1
-
+        self.last_seq = "rot"
         # Make sure Bearing is from -pi to +pi
         Bearing = Bearing % (2*math.pi)
         if Bearing > math.pi:
@@ -1330,6 +1336,7 @@ class DW_Controller(object):
         pos[18] = pos[18+6] = 2.3
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
         rospy.sleep(0.1*T)
+        self.last_seq = "rot"
 
 
     def RotOnMudSeq(self,Delta):
@@ -1429,6 +1436,7 @@ class DW_Controller(object):
         # self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
 
         # raise KeyboardInterrupt
+        self.last_seq = "rot"
 
 
     def CheckTipping(self):
@@ -1446,7 +1454,7 @@ class DW_Controller(object):
             if  P>=0.8:
                 self.Print("Front recovery",'debug1')
                 result = self.FrontTipRecovery()
-            elif abs(p)>0.4*math.pi or abs(r)>0.8*math.pi:
+            elif (self.last_seq == "fwd" and (abs(p)>0.4*math.pi or abs(r)>0.8*math.pi)) or (self.last_seq == "bwd" and abs(r+math.pi)<0.1):
                 # Robot tipped backwards
                 self.Print("Back recovery",'debug1')
                 result = self.BackTipRecovery()
