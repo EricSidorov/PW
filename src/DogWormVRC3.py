@@ -14,7 +14,7 @@ import roslib
 roslib.load_manifest('PW')
 #import roslib; roslib.load_manifest('DogWorm')
 import math, rospy, os, rosparam
-from seq_generator import PW_seq
+import seq_generator
 import tf
 from sensor_msgs.msg import JointState
 from nav_msgs.msg import Odometry
@@ -59,7 +59,7 @@ class DW_Controller(object):
     def __init__(self,iTf):
         super(DW_Controller, self).__init__()
         self._iTf = iTf
-
+        self.gait_params = {'LegSpread':0.0,'PelvisHeight':0.0}
         self.LoadPoses()
 
 
@@ -130,12 +130,12 @@ class DW_Controller(object):
                          ['commands','Shows the list of all available commands'],
                          ['help [command]','Provides help on using a command'],
                          ['exit','Exit this console'],
-                         ['goto [x] [y] [dir]', 'go to point [x,y], dir=fwd/bwd']]
+                         ['goto [x] [y] [dir]', 'go to point [x,y], dir=fwd/bwd'],
+                         ['pelvisheight [value]','Set Pelvis height param']]
 
         self.Gravity = [0,0,-9.81]
         self.GraVecKeep = 0
         self.GraVec = [0,0,-9.81]
-
         self._Point = []
 
         ##################################################################
@@ -328,12 +328,9 @@ class DW_Controller(object):
             if Command.find(String) == 0: ############## LEG SPREAD ##############
                 MotionType = -1
                 CommParted = Command.partition(String)
-
                 args = {'LegSpread':float(CommParted[2])}
-                stream = file('seqs_args.yaml','w')        
-                yaml.dump(args,stream)
+                self.gait_params.update(args)
                 self.LoadPoses()
-
                 self.Print(("Leg spread parameter set to: %.2f. Sequences updated." % float(CommParted[2])),'comm_out')
 
             String = self.Commands[19][0].partition("[")[0]
@@ -463,17 +460,11 @@ class DW_Controller(object):
                     if TestID == 5:
                         self.Test5()
                     if TestID == 6:
-                        self.Test6()
-                signal.alarm(int(1))
+                        self.Test6()                    
+                    if TestID == 7:
+                        self.Test7()
 
-            String = self.Commands[27][0].partition("[")[0]
-            if Command.find(String) == 0: ############### GO TO POINT ###############
-                point_str = Command.split(" ")[1:]
-                if len(point_str) == 3:
-                    Point = [float(point_str[0]) ,float(point_str[1]) ,point_str[2]]
-                    self.GoToPoint(Point)
-                else:
-                    self.Print(("Not enough parameters, required fields: [x] [y] [dir]..."),'system1')
+                signal.alarm(int(1))
 
 
             if Command.find(self.Commands[24][0]) == 0: ########### COMMANDS ###########
@@ -491,7 +482,27 @@ class DW_Controller(object):
                 for com in self.Commands:
                     if com[0].find(CommParted[2])>=0:
                         self.Print(com[0]+" - "+com[1],'system1')
-            
+                        String = self.Commands[27][0].partition("[")[0]
+
+            if Command.find(String) == 0: ############### GO TO POINT ###############
+                MotionType = -1
+                point_str = Command.split(" ")[1:]
+                if len(point_str) == 3:
+                    Point = [float(point_str[0]) ,float(point_str[1]) ,point_str[2]]
+                    self.GoToPoint(Point)
+                else:
+                    self.Print(("Not enough parameters, required fields: [x] [y] [dir]..."),'system1')
+
+            String = self.Commands[28][0].partition("[")[0]
+
+            if Command.find(String) == 0: ############## HipHeight ##############
+                MotionType = -1
+                CommParted = Command.partition(String)
+                args = {'PelvisHeight':float(CommParted[2])}
+                self.gait_params.update(args)
+                self.LoadPoses()
+                self.Print(("PelvisHeight parameter set to: %.2f. Sequences updated." % float(CommParted[2])),'comm_out')
+
         if MotionType == 0:
             self.Print(("Got no command param, aborting..."),'system1')
         elif MotionType < 0:
@@ -619,10 +630,11 @@ class DW_Controller(object):
 
 
     def LoadPoses(self):
-        execfile("seq_generator.py")
+        # execfile("seq_generator.py")
+        reload(seq_generator)
         self.Print('sequence yaml generated','poses')
-        seq_file = file('seqs.yaml','r')
-        seqs = yaml.load(seq_file)
+        # seq_file = file('seqs.yaml','r')
+        seqs = seq_generator.PW_seq(self.gait_params)# yaml.load(seq_file)
         self.RotFlag = seqs.RotFlag
         self.BasStndPose = seqs.BasStndPose
         self.SitDwnSeq1 = seqs.SitDwnSeq1
@@ -809,7 +821,7 @@ class DW_Controller(object):
         while (0 == self.GlobalPos):
             rospy.sleep(1)
             self.Print("Waiting for GlobalPos",'system')
-        while self.PerformStep() == 'going':
+        while self.PerformStep(Point) == 'going':
             pass
 
         # DeltaPos = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
@@ -834,7 +846,7 @@ class DW_Controller(object):
         # self._stuck_counter = 0
 
 
-    def PerformStep(self):
+    def PerformStep(self,point):
         result = 'going'
         self.count_total +=1
         self.Print(('Total_count:', self.count_total),'debug1')
@@ -1771,7 +1783,7 @@ class DW_Controller(object):
 
 
     def Print(self,string,orig):
-        Verbosity = 3
+        Verbosity = 1
 
         VerbLevels = {'system':0, 'system1':1, 'system2':2, 'comm_out':2, 'debug1':3, 'debug2':4, 'comm_in':4, 'poses':4}
 
@@ -1886,6 +1898,26 @@ class DW_Controller(object):
         # Reset gravity
         self.Interface_cb(String('gravec 0 0'))
 
+    def Test7(self):
+        Results = []
+
+        ls = 0.5
+        th = 1
+
+        pelvisheight = [0, 0.25, 0.5, 0.75, 1]
+
+        for ls in pelvisheight:
+            # Test BWD
+            params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'pelvisheight':ls}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'pelvisheight':ls}
+            self.TestSingles(params,Results)
+
+        stream = file('Test7Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
     def TestSingles(self,params,Results):
         # Initialize
         NumSteps = 4
@@ -1898,6 +1930,7 @@ class DW_Controller(object):
         throttle = 1
         legspread = 0.5
         dyaw = 0
+        PelvisHeight = 0
         for k,v in params.iteritems():
             if k == "seq":
                 seq = v.upper()
@@ -1912,6 +1945,12 @@ class DW_Controller(object):
             elif k == "legspread":
                 legspread = v
                 self.Interface_cb(String('legspread %.2f' % legspread))
+            elif k == "pelvisheight":
+                PelvisHeight = v
+                self.Interface_cb(String('pelvisheight %.2f' % PelvisHeight))
+                pass
+
+
 
         if seq.find("ROT") >= 0:
             TestStr = "Rotating "
@@ -1935,7 +1974,7 @@ class DW_Controller(object):
                 TestStr+=") inclined right"
             dTestStr =" {} degrees"
         else:
-            TestStr = "Crawling "+("%d" % NumSteps)+" steps "+seq+" ("+("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)+") on a slope of "
+            TestStr = "Crawling "+("%d" % NumSteps)+" steps "+seq+" ("+("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)+("pelvis height = %.2f" % PelvisHeight)+") on a slope of "
             if incline == "LEFT":
                 dyaw = -math.pi/2
                 dTestStr = "{} degrees inclined left"
@@ -2021,10 +2060,8 @@ class DW_Controller(object):
                 self.Interface_cb(String(SlopeStr))
 
             # Write down result
-            if seq.find("ROT") >= 0:
-                Results.append([seq,incline,throttle,legspread,Slope,y,T1-T0,Dist/(T1-T0)])
-            else:
-                Results.append([seq,incline,throttle,legspread,Slope,Dist,T1-T0,Dist/(T1-T0)])
+            Results.append([['sequence',seq],['incline',incline],['throttle',throttle],['legspread',legspread],['pelvisheight',PelvisHeight],['slope',Slope],['yaw',y],['Distance',Dist],
+                ['time',T1-T0],['avg_vel',Dist/(T1-T0)]])
 
             # Increase slope
             if seq == "FWD":
