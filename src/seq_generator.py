@@ -90,7 +90,11 @@ class PW_seq():
         self.StepDur = []
 
         # Slope should be in deg and non-positive
-        nSlope = Slope/50 # Normalized slope 0 -> -1
+        nSlope = args['Slope']/50.0 # Normalized slope 0 -> -1
+        if nSlope>0:
+            nSlope = 0
+        elif nSlope<-1:
+            nSlope = -1
 
         # Sequence Step 1: Touch ground with pelvis, lift legs
         ThisRobotCnfg = copy(self.SitDwnSeq2)

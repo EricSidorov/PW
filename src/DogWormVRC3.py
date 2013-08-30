@@ -59,7 +59,7 @@ class DW_Controller(object):
     def __init__(self,iTf):
         super(DW_Controller, self).__init__()
         self._iTf = iTf
-        self.gait_params = {'LegSpread':0.0,'PelvisHeight':0.0}
+        self.gait_params = {'LegSpread':0.0,'PelvisHeight':0.0,'Slope':0.0}
         self.LoadPoses()
 
 
@@ -136,7 +136,6 @@ class DW_Controller(object):
         self.Gravity = [0,0,-9.81]
         self.GraVecKeep = 0
         self.GraVec = [0,0,-9.81]
-        self.Steep = 1
         self._Point = []
 
         ##################################################################
@@ -199,12 +198,6 @@ class DW_Controller(object):
                     NumSteps = int(CommSplit[1])
                     Parameters.append(MotionType)
                     Parameters.append(NumSteps)
-                elif CommSplit[1] == "steep":
-                    MotionType = -1
-                    self.Steep = 1
-                elif CommSplit[1] == "nosteep":
-                    MotionType = -1
-                    self.Steep = 0
 
             String = self.Commands[2][0].partition("[")[0]
             if Command.find(String) == 0: ################ BWD ################
@@ -623,10 +616,7 @@ class DW_Controller(object):
             SeqStep = Parameters[2]
             self.Print("Going to %s sequence step %d" % (Sequence, SeqStep),'comm_out')
             if Sequence.find("fwd") == 0:
-                if self.Steep == 0:
-                    self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[SeqStep],1,0.005) 
-                else:
-                    self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg3[SeqStep],1,0.005) 
+                self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[SeqStep],1,0.005) 
                 # self.GoToSeqStep(SeqStep)
             if Sequence.find("bwd") == 0:
                 self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[SeqStep],1,0.005) 
@@ -694,13 +684,24 @@ class DW_Controller(object):
     def GetG_pr(self):
         # Transform gravity vector to local coords
         yaw,p,r = self.current_ypr()
-        x = self.Gravity[0]*math.cos(yaw)+self.Gravity[1]*math.sin(yaw)
-        y = -self.Gravity[0]*math.sin(yaw)+self.Gravity[1]*math.cos(yaw)
-        z = self.Gravity[2]
+        if self.Gravity == [0,0,-9.81]:
+            if self.gait_params['Slope']>0:
+                CurSlope = 0
+            elif self.gait_params['Slope']<-50:
+                CurSlope = -50*math.pi/180
+            else:
+                CurSlope = self.gait_params['Slope']*math.pi/180
 
-        pitch = math.atan2(-x,-z)
-        roll = math.atan2(-y,-z)
-        return pitch, roll
+            PelvisTilt = -2.1483*CurSlope**3-2.9025*CurSlope**2+0.1157*CurSlope-0.6576
+            return PelvisTilt-p, r
+        else:
+            x = self.Gravity[0]*math.cos(yaw)+self.Gravity[1]*math.sin(yaw)
+            y = -self.Gravity[0]*math.sin(yaw)+self.Gravity[1]*math.cos(yaw)
+            z = self.Gravity[2]
+
+            pitch = math.atan2(-x,-z)
+            roll = math.atan2(-y,-z)
+            return pitch, roll
 
 
     def move_neck(self):
@@ -822,6 +823,8 @@ class DW_Controller(object):
         # self.JC.set_gains("l_leg_lax",50,0,5,set_default = False)
         # self.JC.set_gains("r_leg_lax",50,0,5,set_default = False)
         self.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq2,T*0.2,0.005)
+        self.JC.set_gains("l_arm_elx",1200,0,3)
+        self.JC.set_gains("r_arm_elx",1200,0,3)
         self.JC.set_gains("l_arm_mwx",1200,0,10)
         self.JC.set_gains("r_arm_mwx",1200,0,10)
         # self.JC.send_command()
@@ -942,6 +945,7 @@ class DW_Controller(object):
         # What slope are we on?
         p,r = self.GetG_pr()
         Slope = p*180/math.pi
+        print Slope
         # if self.Responses['ftorsotilt'] == 1:
         #     if Slope > 0:
         #         self.TiltTorso(Slope/8)
@@ -954,6 +958,10 @@ class DW_Controller(object):
                 self.SlopeResponse(Slope/30)
         else:
             self.SlopeResponse(0)
+
+        args = {'Slope':Slope}
+        self.gait_params.update(args)
+        self.LoadPoses()
 
         if self.RotFlag == 1:
             self.Print("Getting ready",'debug2')
@@ -1015,10 +1023,7 @@ class DW_Controller(object):
     def DoSeqStep(self): 
         self.Print(('Doing Step seq #',self.CurSeqStep),'debug2')
         #self.traj_with_impedance(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle,0.005) 
-        if self.Steep == 0:
-            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle['FWD'],0.005) 
-        else:
-            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg3[self.CurSeqStep],self.StepDur3[self.CurSeqStep]/self.Throttle['FWD'],0.005) 
+        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],self.StepDur[self.CurSeqStep]/self.Throttle['FWD'],0.005) 
         self.JC.reset_gains()
         self.CurSeqStep += 1
         if self.CurSeqStep > len(self.StepDur)-1:
@@ -1555,7 +1560,7 @@ class DW_Controller(object):
         pos = copy(self.RobotCnfg[-1][:])
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.2,0.01)
 
-        rospy.sleep(0.5)
+        rospy.sleep(1)
         R,P,Y = self.RS.GetIMU()
           
         if  P>=0.8:

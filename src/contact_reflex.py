@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 # import roslib; roslib.load_manifest('DynamicWalk')
-import roslib; roslib.load_manifest('C42_Leg_IK')
+import roslib; roslib.load_manifest('PW')
 import rospy
 import copy
 from atlas_msgs.msg import AtlasState
