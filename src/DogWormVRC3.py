@@ -453,37 +453,41 @@ class DW_Controller(object):
             if Command.find(String) == 0: ################ TEST ################
                 MotionType = -1
                 Parameters.append(MotionType)
-                CommParted = Command.split(" ")
-                TestID = int(CommParted[1])
-                if len(CommParted)==3:
-                    Times = int(CommParted[2])
-                    if Times == 1:
-                        self.Print(("Running test number %d once..." % TestID),'system1')
-                    elif Times == 2:
-                        self.Print(("Running test number %d twice..." % TestID),'system1')
-                    elif Times > 2:
-                        self.Print(("Running test number %d %d times..." % (TestID,Times)),'system1')
-                    else:
-                        Times = 0
-                else:
-                    Times = 1
-                    self.Print(("Running test number %d once..." % TestID),'system1')
+                TestsList = Command.split(" then")
 
-                for x in range(Times):
-                    if TestID == 1:
-                        self.Test1()
-                    if TestID == 2:
-                        self.Test2()
-                    if TestID == 3:
-                        self.Test3()
-                    if TestID == 4:
-                        self.Test4()
-                    if TestID == 5:
-                        self.Test5()
-                    if TestID == 6:
-                        self.Test6()                    
-                    if TestID == 7:
-                        self.Test7()
+                for item in TestsList:
+                    print item
+                    CommParted = item.split(" ")
+                    TestID = int(CommParted[1])
+                    if len(CommParted)==3:
+                        Times = int(CommParted[2])
+                        if Times == 1:
+                            self.Print(("Running test number %d once..." % TestID),'system1')
+                        elif Times == 2:
+                            self.Print(("Running test number %d twice..." % TestID),'system1')
+                        elif Times > 2:
+                            self.Print(("Running test number %d %d times..." % (TestID,Times)),'system1')
+                        else:
+                            Times = 0
+                    else:
+                        Times = 1
+                        self.Print(("Running test number %d once..." % TestID),'system1')
+
+                    for x in range(Times):
+                        if TestID == 1:
+                            self.Test1()
+                        if TestID == 2:
+                            self.Test2()
+                        if TestID == 3:
+                            self.Test3()
+                        if TestID == 4:
+                            self.Test4()
+                        if TestID == 5:
+                            self.Test5()
+                        if TestID == 6:
+                            self.Test6()                    
+                        if TestID == 7:
+                            self.Test7()
 
                 signal.alarm(int(1))
 
@@ -2009,7 +2013,7 @@ class DW_Controller(object):
 
 
     def Test1(self):
-        # Test FWD/BWD sequences going up/downhill with different throttles and 2 stance widths
+        # Test FWD/BWD sequences with different throttles, 2 stance widths and all inclinations (up/down/left/right)
         Results = []
 
         NumSteps = 1
@@ -2021,10 +2025,18 @@ class DW_Controller(object):
                 self.TestSingles(params,Results)
                 params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                 self.TestSingles(params,Results)
+                params = {'seq':"FWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
                 params = {'seq':"BWD", 'type':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                 self.TestSingles(params,Results)
                 params = {'seq':"BWD", 'type':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'type':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'type':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                 self.TestSingles(params,Results)
         
         stream = file('Test1Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
@@ -2032,6 +2044,86 @@ class DW_Controller(object):
 
         # Reset gravity
         self.Interface_cb(String('gravec 0 0'))
+
+
+    def Test2(self):
+        # Test FWD/BWD sequences with different stance widths and all inclinations (up/down/left/right)
+        Results = []
+
+        NumSteps = 1
+        thr = 1
+        LegSpread = [0, 0.25, 0.5, 0.75, 1]
+        for ls in LegSpread:
+            params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+
+            params = {'seq':"BWD", 'type':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+        
+        stream = file('Test2Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
+
+    def Test3(self):
+        # Test FWD sequence going downhill with slope respose enabled
+        Results = []
+
+        slope_switch = self.Responses['slope']
+        self.Responses['slope'] = 1
+
+        NumSteps = 2
+        thr = 1
+        ls = 1
+        params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+        self.TestSingles(params,Results)
+        
+        stream = file('Test3Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+        self.Responses['slope'] = slope_switch
+
+
+    def Test4(self):
+        # Test BWD sequence with different pelvis heights and all inclinations (up/down/left/right)
+        Results = []
+
+        NumSteps = 1
+        thr = 1
+        ls = 0.5
+        PelvisHeight = [0, 0.25, 0.5, 0.75, 1]
+        for ph in PelvisHeight:
+            params = {'seq':"BWD", 'type':"DOWN", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"UP", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"LEFT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+        
+        stream = file('Test4Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
 
         # Results = []
         # res_file = file('TurnTest.txt','w')
