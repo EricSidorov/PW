@@ -1824,7 +1824,7 @@ class DW_Controller(object):
 
             # Sit down
             # Extend hands accordingly
-            if Slope<0 and TestConfig['seq'] == "FWD":
+            if Slope<0 and TestConfig['seq'] == "FWD" and self.Responses['slope'] == 1:
                 self.SitDwnSeq1[17] = self.SitDwnSeq2[17] = -1.0-0.75*Slope/180*math.pi
                 self.SitDwnSeq1[17+6] = self.SitDwnSeq2[17+6] = 1.0+0.75*Slope/180*math.pi
             self.Interface_cb(String('sit'))
