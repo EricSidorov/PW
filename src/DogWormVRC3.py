@@ -2155,199 +2155,199 @@ class DW_Controller(object):
         # return
 
 
-    def Test2(self):
-        Results = []
+    # def Test2(self):
+    #     Results = []
 
-        # Test FWD sequence going up/downhill
-        Throttles = [0.5, 0.75, 1, 1.1, 1.2]
-        for thr in Throttles:
-            params = {'seq':"FWD", 'type':"DOWN", 'throttle':thr, 'legspread':0.5}
-            self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'type':"UP", 'throttle':thr, 'legspread':0.5}
-            self.TestSingles(params,Results)
+    #     # Test FWD sequence going up/downhill
+    #     Throttles = [0.5, 0.75, 1, 1.1, 1.2]
+    #     for thr in Throttles:
+    #         params = {'seq':"FWD", 'type':"DOWN", 'throttle':thr, 'legspread':0.5}
+    #         self.TestSingles(params,Results)
+    #         params = {'seq':"FWD", 'type':"UP", 'throttle':thr, 'legspread':0.5}
+    #         self.TestSingles(params,Results)
 
-        # Test BWD sequence going up/downhill
-        Throttles = [0.5, 0.75, 1, 1.25, 1.5]
-        for thr in Throttles:
-            params = {'seq':"BWD", 'type':"DOWN", 'throttle':thr, 'legspread':0.5}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'type':"UP", 'throttle':thr, 'legspread':0.5}
-            self.TestSingles(params,Results)
+    #     # Test BWD sequence going up/downhill
+    #     Throttles = [0.5, 0.75, 1, 1.25, 1.5]
+    #     for thr in Throttles:
+    #         params = {'seq':"BWD", 'type':"DOWN", 'throttle':thr, 'legspread':0.5}
+    #         self.TestSingles(params,Results)
+    #         params = {'seq':"BWD", 'type':"UP", 'throttle':thr, 'legspread':0.5}
+    #         self.TestSingles(params,Results)
         
-        stream = file('Test2Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+    #     stream = file('Test2Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+    #     yaml.dump(Results,stream)
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+    #     # Reset gravity
+    #     self.Interface_cb(String('gravec 0 0'))
 
 
-    def Test3(self):
-        Results = []
+    # def Test3(self):
+    #     Results = []
 
-        LegSpread = [0, 0.25, 0.5, 0.75, 1]
-        for ls in LegSpread:
-            # Test FWD sequence going up/downhill
-            params = {'seq':"FWD", 'type':"DOWN", 'throttle':1, 'legspread':ls}
-            self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'type':"UP", 'throttle':1, 'legspread':ls}
-            self.TestSingles(params,Results)
+    #     LegSpread = [0, 0.25, 0.5, 0.75, 1]
+    #     for ls in LegSpread:
+    #         # Test FWD sequence going up/downhill
+    #         params = {'seq':"FWD", 'type':"DOWN", 'throttle':1, 'legspread':ls}
+    #         self.TestSingles(params,Results)
+    #         params = {'seq':"FWD", 'type':"UP", 'throttle':1, 'legspread':ls}
+    #         self.TestSingles(params,Results)
 
-            # Test BWD sequence going up/downhill
-            params = {'seq':"BWD", 'type':"DOWN", 'throttle':1, 'legspread':ls}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'type':"UP", 'throttle':1, 'legspread':ls}
-            self.TestSingles(params,Results)
+    #         # Test BWD sequence going up/downhill
+    #         params = {'seq':"BWD", 'type':"DOWN", 'throttle':1, 'legspread':ls}
+    #         self.TestSingles(params,Results)
+    #         params = {'seq':"BWD", 'type':"UP", 'throttle':1, 'legspread':ls}
+    #         self.TestSingles(params,Results)
         
-        stream = file('Test3Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+    #     stream = file('Test3Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+    #     yaml.dump(Results,stream)
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+    #     # Reset gravity
+    #     self.Interface_cb(String('gravec 0 0'))
 
 
-    def Test4(self):
-        set_mu_srv = rospy.ServiceProxy('/SetMu', SetFric)
-        ## Fast rotation ###
-        res_file = file('MudTurnTestFast_damp_10.txt','w')
-        res_str = "{0} {1} {2}\n"
-        Nthrot = 5;
-        Nfric = 8;
-        throt = linspace(0.5,1.5,Nthrot)
-        fric = linspace(0.1,0.8,Nfric)
-        Nturn = 10;
-        self.Interface_cb(String('frknee 0.8'))
-        self.Interface_cb(String('rot type fast'))
-        n = 1
-        print "\n Testing fast rotation \n"
-        for j in fric:
-            set_mu_srv(SetFricRequest(j,j))
-            for i in throt:
-                self.Interface_cb(String('throttle FROT %.4f' % i))
-                self.Interface_cb(String('reset'))
-                self.Interface_cb(String('sit'))
-                for k in xrange(0,Nturn):
-                    y,p,r = self.current_ypr()
-                    self.Interface_cb(String('rot 1'))
-                    rospy.sleep(0.5)                    
-                    yn,pn,rn = self.current_ypr()
-                    d_yaw = self.DeltaAngle(y,yn)
-                    res_file.write(res_str.format(j,i,d_yaw))
-                    stdout.write("\r done %d out of %d" % (n,Nthrot*Nturn*Nfric))
-                    stdout.flush()
-                    n = n+1
-        res_file.close()
-        ## Test slow rotation ###
-        print "\n Testing slow rotation \n"
-        res_file = file('MudTurnTestSlow_damp_10.txt','w')
-        res_str = "{0} {1} {2}\n"
-        Nthrot = 5;
-        Nfric = 8;
-        throt = linspace(0.5,1.5,Nthrot);
-        fric = linspace(0.1,0.8,8)
-        Nturn = 10;
-        self.Interface_cb(String('rot type slow'))
-        n = 1
-        for j in fric:
-            set_mu_srv(SetFricRequest(j,j))
-            for i in throt:
-                self.Interface_cb(String('throttle SROT %.4f' % i))
-                self.Interface_cb(String('reset'))
-                self.Interface_cb(String('sit'))
-                for k in xrange(0,Nturn):
-                    y,p,r = self.current_ypr()
-                    self.Interface_cb(String('rot 1'))
-                    rospy.sleep(0.5)                    
-                    yn,pn,rn = self.current_ypr()
-                    d_yaw = self.DeltaAngle(y,yn)
-                    res_file.write(res_str.format(j,i,d_yaw))
-                    stdout.write("\r done %d out of %d" % (n,Nthrot*Nturn*Nfric))
-                    stdout.flush()
-                    n = n+1
-        res_file.close()
-        return
+    # def Test4(self):
+    #     set_mu_srv = rospy.ServiceProxy('/SetMu', SetFric)
+    #     ## Fast rotation ###
+    #     res_file = file('MudTurnTestFast_damp_10.txt','w')
+    #     res_str = "{0} {1} {2}\n"
+    #     Nthrot = 5;
+    #     Nfric = 8;
+    #     throt = linspace(0.5,1.5,Nthrot)
+    #     fric = linspace(0.1,0.8,Nfric)
+    #     Nturn = 10;
+    #     self.Interface_cb(String('frknee 0.8'))
+    #     self.Interface_cb(String('rot type fast'))
+    #     n = 1
+    #     print "\n Testing fast rotation \n"
+    #     for j in fric:
+    #         set_mu_srv(SetFricRequest(j,j))
+    #         for i in throt:
+    #             self.Interface_cb(String('throttle FROT %.4f' % i))
+    #             self.Interface_cb(String('reset'))
+    #             self.Interface_cb(String('sit'))
+    #             for k in xrange(0,Nturn):
+    #                 y,p,r = self.current_ypr()
+    #                 self.Interface_cb(String('rot 1'))
+    #                 rospy.sleep(0.5)                    
+    #                 yn,pn,rn = self.current_ypr()
+    #                 d_yaw = self.DeltaAngle(y,yn)
+    #                 res_file.write(res_str.format(j,i,d_yaw))
+    #                 stdout.write("\r done %d out of %d" % (n,Nthrot*Nturn*Nfric))
+    #                 stdout.flush()
+    #                 n = n+1
+    #     res_file.close()
+    #     ## Test slow rotation ###
+    #     print "\n Testing slow rotation \n"
+    #     res_file = file('MudTurnTestSlow_damp_10.txt','w')
+    #     res_str = "{0} {1} {2}\n"
+    #     Nthrot = 5;
+    #     Nfric = 8;
+    #     throt = linspace(0.5,1.5,Nthrot);
+    #     fric = linspace(0.1,0.8,8)
+    #     Nturn = 10;
+    #     self.Interface_cb(String('rot type slow'))
+    #     n = 1
+    #     for j in fric:
+    #         set_mu_srv(SetFricRequest(j,j))
+    #         for i in throt:
+    #             self.Interface_cb(String('throttle SROT %.4f' % i))
+    #             self.Interface_cb(String('reset'))
+    #             self.Interface_cb(String('sit'))
+    #             for k in xrange(0,Nturn):
+    #                 y,p,r = self.current_ypr()
+    #                 self.Interface_cb(String('rot 1'))
+    #                 rospy.sleep(0.5)                    
+    #                 yn,pn,rn = self.current_ypr()
+    #                 d_yaw = self.DeltaAngle(y,yn)
+    #                 res_file.write(res_str.format(j,i,d_yaw))
+    #                 stdout.write("\r done %d out of %d" % (n,Nthrot*Nturn*Nfric))
+    #                 stdout.flush()
+    #                 n = n+1
+    #     res_file.close()
+    #     return
 
             
-    def Test5(self):
-        Results = []
+    # def Test5(self):
+    #     Results = []
 
-        ls = 0.5
-        th = 1
+    #     ls = 0.5
+    #     th = 1
 
-        # Test fast rotation
-        params = {'seq':"FROT", 'type':"UP", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"FROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"FROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"FROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
+    #     # Test fast rotation
+    #     params = {'seq':"FROT", 'type':"UP", 'throttle':th, 'legspread':ls}
+    #     self.TestSingles(params,Results)
+    #     params = {'seq':"FROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+    #     self.TestSingles(params,Results)
+    #     params = {'seq':"FROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
+    #     self.TestSingles(params,Results)
+    #     params = {'seq':"FROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+    #     self.TestSingles(params,Results)
 
-        # Test slow rotation
-        params = {'seq':"SROT", 'type':"UP", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"SROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"SROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"SROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
+    #     # Test slow rotation
+    #     params = {'seq':"SROT", 'type':"UP", 'throttle':th, 'legspread':ls}
+    #     self.TestSingles(params,Results)
+    #     params = {'seq':"SROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+    #     self.TestSingles(params,Results)
+    #     params = {'seq':"SROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
+    #     self.TestSingles(params,Results)
+    #     params = {'seq':"SROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+    #     self.TestSingles(params,Results)
 
-        stream = file('Test5Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+    #     stream = file('Test5Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+    #     yaml.dump(Results,stream)
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+    #     # Reset gravity
+    #     self.Interface_cb(String('gravec 0 0'))
 
 
-    def Test6(self):
-        Results = []
+    # def Test6(self):
+    #     Results = []
 
-        ls = 0.5
-        th = 1
+    #     ls = 0.5
+    #     th = 1
 
-        LegSpread = [0, 0.25, 0.5, 0.75, 1]
+    #     LegSpread = [0, 0.25, 0.5, 0.75, 1]
 
-        for ls in LegSpread:
-            # Test FWD
-            params = {'seq':"FWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
-            self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
-            self.TestSingles(params,Results)
+    #     for ls in LegSpread:
+    #         # Test FWD
+    #         params = {'seq':"FWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+    #         self.TestSingles(params,Results)
+    #         params = {'seq':"FWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+    #         self.TestSingles(params,Results)
             
-            # Test BWD
-            params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
-            self.TestSingles(params,Results)
+    #         # Test BWD
+    #         params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+    #         self.TestSingles(params,Results)
+    #         params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+    #         self.TestSingles(params,Results)
 
-        stream = file('Test6Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+    #     stream = file('Test6Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+    #     yaml.dump(Results,stream)
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+    #     # Reset gravity
+    #     self.Interface_cb(String('gravec 0 0'))
 
 
-    def Test7(self):
-        Results = []
+    # def Test7(self):
+    #     Results = []
 
-        ls = 0.5
-        th = 1
+    #     ls = 0.5
+    #     th = 1
 
-        pelvisheight = [0, 0.25, 0.5, 0.75, 1]
+    #     pelvisheight = [0, 0.25, 0.5, 0.75, 1]
 
-        for ls in pelvisheight:
-            # Test BWD
-            params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'pelvisheight':ls}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'pelvisheight':ls}
-            self.TestSingles(params,Results)
+    #     for ls in pelvisheight:
+    #         # Test BWD
+    #         params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'pelvisheight':ls}
+    #         self.TestSingles(params,Results)
+    #         params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'pelvisheight':ls}
+    #         self.TestSingles(params,Results)
 
-        stream = file('Test7Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+    #     stream = file('Test7Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+    #     yaml.dump(Results,stream)
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+    #     # Reset gravity
+    #     self.Interface_cb(String('gravec 0 0'))
 
 
     def Alarm(self,signum, frame):
