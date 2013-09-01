@@ -10,15 +10,7 @@ class PW_seq():
         ##################################################################
         ######################## GAIT PARAMETERS #########################
         ##################################################################
-        self.CurSeqStep = 0
-        self.CurSeqStep2 = 0
-        self.Throttle = {'FWD': 1, 'BWD': 1, 'FROT': 1, 'SROT': 1}
-        self.RotFlag = 0
-        self.Responses = {'bearing':0, 'ftorsotilt':0, 'fpitch':0}
-        self.DesOri = 0
 
-        self.count_total = 0
-        self.count_tipping = 0
         self.BaseHipZ = 0.05+args['LegSpread']*0.3
         # self.BaseHipZ = 0.05
         
@@ -270,7 +262,8 @@ class PW_seq():
         ThisRobotCnfg[1] = 0.5
         ThisRobotCnfg[4] = self.BaseHipZ
         ThisRobotCnfg[4+6] = -self.BaseHipZ
-        ThisRobotCnfg[5] = ThisRobotCnfg[5+6] = 0
+        ThisRobotCnfg[5] = self.BaseHipZ
+        ThisRobotCnfg[5+6] = -self.BaseHipZ
         ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.7
         ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 1.0
         ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.8
@@ -288,8 +281,6 @@ class PW_seq():
         # Sequence Step 2: Bring pelvis down to the ground and lift arms
         ThisRobotCnfg = copy(self.SitDwnSeq2)
         ThisRobotCnfg[1] = 0.5
-        ThisRobotCnfg[4] = self.BaseHipZ
-        ThisRobotCnfg[4+6] = -self.BaseHipZ
         ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.7
         ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 1.0
         ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.8

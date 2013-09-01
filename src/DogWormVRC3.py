@@ -59,8 +59,6 @@ class DW_Controller(object):
     def __init__(self,iTf):
         super(DW_Controller, self).__init__()
         self._iTf = iTf
-        self.gait_params = {'LegSpread':0.0,'PelvisHeight':0.0,'Slope':0.0}
-        self.LoadPoses()
 
 
     ##################################################################
@@ -162,6 +160,24 @@ class DW_Controller(object):
         self.JC.set_gains("r_arm_elx",1200,0,5)
         self.JC.set_gains("l_arm_mwx",1200,0,5)
         self.JC.set_gains("r_arm_mwx",1200,0,5)
+
+        ##################################################################
+        ######################## GAIT PARAMETERS #########################
+        ##################################################################
+
+        self.CurSeqStep = 0
+        self.CurSeqStep2 = 0
+        self.Throttle = {'FWD': 1, 'BWD': 1, 'FROT': 1, 'SROT': 1}
+
+        self.Responses = {'bearing':0, 'slope':0}
+        # self.Responses = {'bearing':0, 'ftorsotilt':0, 'fpitch':0}
+        self.DesOri = 0
+
+        self.count_total = 0
+        self.count_tipping = 0
+
+        self.gait_params = {'Slope':0.0,'LegSpread':0.0,'PelvisHeight':0.0,'FRotKnee':1.0}
+        self.LoadPoses()
 
     ##################################################################
     ########################### FUNCTIONS ############################
@@ -334,8 +350,7 @@ class DW_Controller(object):
             if Command.find(String) == 0: ############## LEG SPREAD ##############
                 MotionType = -1
                 CommParted = Command.partition(String)
-                args = {'LegSpread':float(CommParted[2])}
-                self.gait_params.update(args)
+                self.gait_params['LegSpread']=float(CommParted[2])
                 self.LoadPoses()
                 self.Print(("Leg spread parameter set to: %.2f. Sequences updated." % float(CommParted[2])),'comm_out')
 
@@ -343,7 +358,7 @@ class DW_Controller(object):
             if Command.find(String) == 0: ########### FR KNEE EXTENSION ###########
                 MotionType = -1
                 CommParted = Command.partition(String)
-                self.FRKneeExt = float(CommParted[2])
+                self.gait_params['FRotKnee']=float(CommParted[2])
                 self.Print(("Knee ext. parameter for fast rotation sequence set to: %.2f" % self.FRKneeExt),'comm_out')
 
             String = self.Commands[20][0].partition("[")[0]
@@ -472,7 +487,6 @@ class DW_Controller(object):
 
                 signal.alarm(int(1))
 
-
             if Command.find(self.Commands[24][0]) == 0: ########### COMMANDS ###########
                 MotionType = -1
                 self.Print("Available commands:",'system1')
@@ -504,8 +518,7 @@ class DW_Controller(object):
             if Command.find(String) == 0: ############## HipHeight ##############
                 MotionType = -1
                 CommParted = Command.partition(String)
-                args = {'PelvisHeight':float(CommParted[2])}
-                self.gait_params.update(args)
+                self.gait_params['PelvisHeight']=float(CommParted[2])
                 self.LoadPoses()
                 self.Print(("PelvisHeight parameter set to: %.2f. Sequences updated." % float(CommParted[2])),'comm_out')
 
@@ -641,7 +654,7 @@ class DW_Controller(object):
         self.Print('sequence yaml generated','poses')
         # seq_file = file('seqs.yaml','r')
         seqs = seq_generator.PW_seq(self.gait_params)# yaml.load(seq_file)
-        self.RotFlag = seqs.RotFlag
+
         self.BasStndPose = seqs.BasStndPose
         self.SitDwnSeq1 = seqs.SitDwnSeq1
         self.SitDwnSeq2 = seqs.SitDwnSeq2
@@ -652,14 +665,7 @@ class DW_Controller(object):
         self.StepDur = seqs.StepDur
         self.StepDur2 = seqs.StepDur2
         self.StepDur3 = seqs.StepDur3
-        self.Throttle = seqs.Throttle
-        self.count_tipping = seqs.count_tipping
-        self.count_total = seqs.count_total
         self.BaseHipZ = seqs.BaseHipZ
-        self.CurSeqStep = seqs.CurSeqStep
-        self.CurSeqStep2 = seqs.CurSeqStep2
-        self.DesOri = seqs.DesOri
-        self.Responses = seqs.Responses
 
 
     def RS_cb(self,msg):
@@ -829,7 +835,7 @@ class DW_Controller(object):
         self.JC.set_gains("r_arm_mwx",1200,0,10)
         # self.JC.send_command()
         # rospy.sleep(T*0.2)
-        self.last_seq = "sit"
+        self.last_seq = "SIT"
 
 
     def DoPath(self,Path):
@@ -951,28 +957,25 @@ class DW_Controller(object):
         #         self.TiltTorso(Slope/8)
         #     if Slope > 12:
         #         self.TiltTorso(1.5)
-        if self.Responses['fpitch'] == 1:
-            if Slope > 0:
-                self.SlopeResponse(Slope/10)
-            else:
-                self.SlopeResponse(Slope/30)
-        else:
-            self.SlopeResponse(0)
+        # if self.Responses['fpitch'] == 1:
+        #     if Slope > 0:
+        #         self.SlopeResponse(Slope/10)
+        #     else:
+        #         self.SlopeResponse(Slope/30)
+        # else:
+        #     self.SlopeResponse(0)
+        if self.Responses['slope'] == 1:
+            self.gait_params['Slope'] = Slope
+            self.LoadPoses()
 
-        args = {'Slope':Slope}
-        self.gait_params.update(args)
-        self.LoadPoses()
-
-        if self.RotFlag == 1:
+        if self.last_seq != "FWD":
             self.Print("Getting ready",'debug2')
-            self.RotFlag = 2
             self.CurSeqStep = 0
-            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],0.5,0.005)
+            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],1,0.005)
 
         self.GoToSeqStep(len(self.StepDur))
         rospy.sleep(0.2)
-        self.RotFlag = 0
-        self.last_seq = "fwd"
+        self.last_seq = "FWD"
 
 
     def BackCrawl(self):
@@ -990,11 +993,14 @@ class DW_Controller(object):
         else:
             self.AddBackRotation(0)
 
-        if self.RotFlag == 1:
-            self.RotFlag = 2
-            self.GoToBackSeqStep(1)
+        if self.last_seq != "BWD":
+            self.Print("Getting ready",'debug2')
+            self.CurSeqStep2 = 0
+            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[self.CurSeqStep2],1,0.005)
+
         self.GoToBackSeqStep(len(self.StepDur2))
-        self.last_seq = "bwd"
+        rospy.sleep(0.2)
+        self.last_seq = "BWD"
 
 
     def GoToSeqStep(self,Step):
@@ -1110,72 +1116,67 @@ class DW_Controller(object):
         self.RobotCnfg2[0][2] = 0
 
 
-    def SlopeResponse(self,Delta):
-        # Delta goes from -1 to 1
-        # Delta 0 is for 0 degrees
-        # Delta 1 is for 10 degrees upslope
-        # Delta -1 is for 40 degrees downslope
-        if Delta > 0:
-            dTorso = 0
-            HHDist = 0.7 + 0.3*Delta
-            HFDist = 0.3 - 0.3*Delta
-        else:
-            dTorso = 0.5*Delta
-            HHDist = 0.7
-            HFDist = 0.3 - 1.5*Delta
+    # def SlopeResponse(self,Delta):
+    #     # Delta goes from -1 to 1
+    #     # Delta 0 is for 0 degrees
+    #     # Delta 1 is for 10 degrees upslope
+    #     # Delta -1 is for 40 degrees downslope
+    #     if Delta > 0:
+    #         dTorso = 0
+    #         HHDist = 0.7 + 0.3*Delta
+    #         HFDist = 0.3 - 0.3*Delta
+    #     else:
+    #         dTorso = 0.5*Delta
+    #         HHDist = 0.7
+    #         HFDist = 0.3 - 1.5*Delta
 
-        # Sequence Step 1: Touch ground with pelvis, lift legs
-        self.RobotCnfg[0][1] = 1.0+2*dTorso
-        self.RobotCnfg[0][7] = self.RobotCnfg[0][7+6] = 2.4-0.6*HFDist
-        self.RobotCnfg[0][8] = self.RobotCnfg[0][8+6] = 0.3+0.3*HFDist
+    #     # Sequence Step 1: Touch ground with pelvis, lift legs
+    #     self.RobotCnfg[0][1] = 1.0+2*dTorso
+    #     self.RobotCnfg[0][7] = self.RobotCnfg[0][7+6] = 2.4-0.6*HFDist
+    #     self.RobotCnfg[0][8] = self.RobotCnfg[0][8+6] = 0.3+0.3*HFDist
 
-        # Sequence Step 2: Extend legs
-        self.RobotCnfg[1][1] = 0.4+1.5*dTorso
-        self.RobotCnfg[1][17] = -0.8-0.4*HHDist-1.2*dTorso
-        self.RobotCnfg[1][17+6] = 0.8+0.4*HHDist+1.2*dTorso
+    #     # Sequence Step 2: Extend legs
+    #     self.RobotCnfg[1][1] = 0.4+1.5*dTorso
+    #     self.RobotCnfg[1][17] = -0.8-0.4*HHDist-1.2*dTorso
+    #     self.RobotCnfg[1][17+6] = 0.8+0.4*HHDist+1.2*dTorso
 
-        # Sequence Step 3: Put legs down, bringing torso forward and raising arms
-        self.RobotCnfg[2][1] = 0.3+1.5*dTorso
-        self.RobotCnfg[2][16] = self.RobotCnfg[2][16+6] = 0.6+0.3*HHDist # 0
-        self.RobotCnfg[2][18] = self.RobotCnfg[2][18+6] = 2.6+0.4*HHDist
+    #     # Sequence Step 3: Put legs down, bringing torso forward and raising arms
+    #     self.RobotCnfg[2][1] = 0.3+1.5*dTorso
+    #     self.RobotCnfg[2][16] = self.RobotCnfg[2][16+6] = 0.6+0.3*HHDist # 0
+    #     self.RobotCnfg[2][18] = self.RobotCnfg[2][18+6] = 2.6+0.4*HHDist
 
-        # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
-        self.RobotCnfg[3][1] = -0.1+0.5*HHDist+1.5*dTorso
-        self.RobotCnfg[3][16] = self.RobotCnfg[3][16+6] = 0.8*HHDist+0.3*dTorso # BASE 0.6 # 1
-        self.RobotCnfg[3][17] = -1.35-1.2*dTorso
-        self.RobotCnfg[3][17+6] = 1.35+1.2*dTorso
-        # self.RobotCnfg[3][18] = self.RobotCnfg[3][18+6] = 2.5+0.4*dTorso
-        self.RobotCnfg[3][19] = 0.3-1.1*dTorso
-        self.RobotCnfg[3][19+6] = -0.3+1.1*dTorso
+    #     # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
+    #     self.RobotCnfg[3][1] = -0.1+0.5*HHDist+1.5*dTorso
+    #     self.RobotCnfg[3][16] = self.RobotCnfg[3][16+6] = 0.8*HHDist+0.3*dTorso # BASE 0.6 # 1
+    #     self.RobotCnfg[3][17] = -1.35-1.2*dTorso
+    #     self.RobotCnfg[3][17+6] = 1.35+1.2*dTorso
+    #     # self.RobotCnfg[3][18] = self.RobotCnfg[3][18+6] = 2.5+0.4*dTorso
+    #     self.RobotCnfg[3][19] = 0.3-1.1*dTorso
+    #     self.RobotCnfg[3][19+6] = -0.3+1.1*dTorso
 
-        # Sequence Step 5: Bring pelvis forward, closer to legs
-        self.RobotCnfg[4][7] = self.RobotCnfg[4][7+6] = 2.4-0.6*HFDist
-        self.RobotCnfg[4][8] = self.RobotCnfg[4][8+6] = 0.3*HFDist
-        self.RobotCnfg[4][16] = self.RobotCnfg[4][16+6] = 1.0+0.4*dTorso
-        self.RobotCnfg[4][17] = -1.0-0.2*HHDist-1.3*dTorso
-        self.RobotCnfg[4][17+6] = 1.0+0.2*HHDist+1.3*dTorso
-        # self.RobotCnfg[4][18] = self.RobotCnfg[4][18+6] = 3.0+0.6*dTorso
-        self.RobotCnfg[4][19] = 0.05-1.3*dTorso
-        self.RobotCnfg[4][19+6] = -0.05+1.3*dTorso
+    #     # Sequence Step 5: Bring pelvis forward, closer to legs
+    #     self.RobotCnfg[4][7] = self.RobotCnfg[4][7+6] = 2.4-0.6*HFDist
+    #     self.RobotCnfg[4][8] = self.RobotCnfg[4][8+6] = 0.3*HFDist
+    #     self.RobotCnfg[4][16] = self.RobotCnfg[4][16+6] = 1.0+0.4*dTorso
+    #     self.RobotCnfg[4][17] = -1.0-0.2*HHDist-1.3*dTorso
+    #     self.RobotCnfg[4][17+6] = 1.0+0.2*HHDist+1.3*dTorso
+    #     # self.RobotCnfg[4][18] = self.RobotCnfg[4][18+6] = 3.0+0.6*dTorso
+    #     self.RobotCnfg[4][19] = 0.05-1.3*dTorso
+    #     self.RobotCnfg[4][19+6] = -0.05+1.3*dTorso
 
 
-    def TiltTorso(self,Delta):
-        # Delta of 1 is for 8 degrees
-        # Add gait changes to appropriate step
-        self.RobotCnfg[2][1] = 0.3+Delta*0.4
-        self.RobotCnfg[2][16] = self.RobotCnfg[2][16+6] = 0.7-Delta*0.7
-        self.RobotCnfg[3][16] = self.RobotCnfg[3][16+6] = 0.6+Delta*0.4
+    # def TiltTorso(self,Delta):
+    #     # Delta of 1 is for 8 degrees
+    #     # Add gait changes to appropriate step
+    #     self.RobotCnfg[2][1] = 0.3+Delta*0.4
+    #     self.RobotCnfg[2][16] = self.RobotCnfg[2][16+6] = 0.7-Delta*0.7
+    #     self.RobotCnfg[3][16] = self.RobotCnfg[3][16+6] = 0.6+Delta*0.4
 
 
     def RotateToOri(self,Bearing):
         if self._terrain == "MUD" or self._terrain == "HILLS":
             return self.RotateToOriInMud(Bearing)
         else:
-            if self.RotFlag == 2:
-                self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1][:],1,0.01)
-            self.RotFlag = 1
-            self.last_seq = "rot"
-
             # Make sure Bearing is from -pi to +pi
             Bearing = Bearing % (2*math.pi)
             if Bearing > math.pi:
@@ -1184,7 +1185,6 @@ class DW_Controller(object):
                 Bearing += 2*math.pi
 
             # Get into "break-dance" configuration
-            #self.GoToSeqStep(3)
             pos=copy(self.RobotCnfg[2][:])
             pos[1] = 0.9
             pos[6] = pos[6+6] = -1.7
@@ -1195,7 +1195,8 @@ class DW_Controller(object):
             pos[18] = pos[18+6] = 2
             pos[19] = 1.0
             pos[19+6] = -1.0
-            self.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01) 
+            self.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01)
+            self.last_seq = "FROT"
 
             # Get current orientation
             y0,p,r = self.current_ypr()
@@ -1230,14 +1231,7 @@ class DW_Controller(object):
                 y0 = y
                 Angle=self.DeltaAngle(Bearing,y0)
 
-            # # Return to original configuration
-
-            # self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[0][:],0.5,0.01) 
-            # self.CurSeqStep = 0
-            # self.CurSeqStep2 = 0
-            #############################################
             # Return to original configuration
-
             self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1][:],1,0.01)
             rospy.sleep(0.5)
             self.CurSeqStep = 0
@@ -1246,8 +1240,6 @@ class DW_Controller(object):
 
 
     def RotateToOriInMud(self,Bearing):
-        self.RotFlag = 1
-        self.last_seq = "rot"
         # Make sure Bearing is from -pi to +pi
         Bearing = Bearing % (2*math.pi)
         if Bearing > math.pi:
@@ -1256,6 +1248,7 @@ class DW_Controller(object):
             Bearing += 2*math.pi
 
         self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],1.5,0.01)
+        self.last_seq = "SROT"
 
         # Get current orientation
         y0,p,r = self.current_ypr()
@@ -1283,14 +1276,7 @@ class DW_Controller(object):
             # Angle=self.DeltaAngle(Bearing,y0)
             Angle=self.DeltaAngle(Bearing,y0)
 
-        # # Return to original configuration
-        # self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[0][:],0.5,0.01) 
-        # self.CurSeqStep = 0
-        # self.CurSeqStep2 = 0
-
-        #############################################
-            # Return to original configuration
-
+        # Return to original configuration
         self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[4][:],2,0.01)
         rospy.sleep(1)
         self.CurSeqStep2 = 4
@@ -1301,7 +1287,7 @@ class DW_Controller(object):
         # Delta of 1 gives a left rotation of approx.:
         # 0.95 radians for Speed = 1
         # 0.5 radians for Speed = 0
-        Speed = self.FRKneeExt
+        Speed = self.gait_params['FRotKnee']
 
         knee0 = 1.1+(1-Speed)*0.8
         hip0 = self.BaseHipZ/2
@@ -1322,9 +1308,9 @@ class DW_Controller(object):
         pos[19] = 0.6
         pos[19+6] = -0.6
 
-        if self.RotFlag != 1:
-            self.send_pos_traj(self.RS.GetJointPos(),pos,0.5,0.005) 
-        self.RotFlag = 1
+        if self.last_seq != "FROT":
+            self.Print("Getting ready",'debug2')
+            self.send_pos_traj(self.RS.GetJointPos(),pos,1,0.005) 
 
         T=1./self.Throttle['FROT']
         if Delta>0:
@@ -1343,6 +1329,7 @@ class DW_Controller(object):
         pos[19+6-dID] = -sign*(0.6+d_arm)
         pos[18] = pos[18+6] = 2.4+0.4*(1-Speed)
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
+
         # Rotate first leg outwards until it touches ground
         pos[4+dID] = hip0*sign+Delta*sign*0.35
         pos[4+6-dID] = -hip0*sign-Delta*sign*0.35
@@ -1350,10 +1337,12 @@ class DW_Controller(object):
         pos[5+6-dID] = -hip0*sign-Delta*sign*0.2
         pos[9+dID] = Delta*sign*0.2
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.24*T,0.005) 
+
         # Lift other leg, now all the weight is on first leg
         pos[7+dID] = knee0
         pos[7+6-dID] = knee0-1
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
+
         # Return first leg and torso to original configuration
         pos[4+dID] = hip0*sign
         pos[4+6-dID] = -hip0*sign
@@ -1362,6 +1351,7 @@ class DW_Controller(object):
         pos[7+dID] = knee0
         pos[9+dID] = 0
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.24*T,0.005) 
+
         # Return other leg to original configuration
         pos[7+6-dID] = knee0
         pos[17+dID] = -sign*(arm0)
@@ -1371,7 +1361,8 @@ class DW_Controller(object):
         pos[18] = pos[18+6] = 2.3
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
         rospy.sleep(0.1*T)
-        self.last_seq = "rot"
+
+        self.last_seq = "FROT"
 
 
     def RotOnMudSeq(self,Delta):
@@ -1386,7 +1377,6 @@ class DW_Controller(object):
             dID = 6
             sign = -1
 
-        self.RotFlag = 1
         T=1/self.Throttle['SROT']
 
         # Get into starting position
@@ -1467,11 +1457,7 @@ class DW_Controller(object):
         # # y0,p,r = self.current_ypr()
         # # pos[2] = -0.5*r
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
-
-        # self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
-
-        # raise KeyboardInterrupt
-        self.last_seq = "rot"
+        self.last_seq = "SROT"
 
 
     def CheckTipping(self):
@@ -1489,7 +1475,7 @@ class DW_Controller(object):
             if  P>=0.8:
                 self.Print("Front recovery",'debug1')
                 result = self.FrontTipRecovery()
-            elif (self.last_seq == "fwd" and (abs(p)>0.4*math.pi or abs(r)>0.8*math.pi)) or (self.last_seq == "bwd" and abs(r+math.pi)<0.1):
+            elif (self.last_seq == "FWD" and (abs(p)>0.4*math.pi or abs(r)>0.8*math.pi)) or (self.last_seq == "BWD" and abs(r+math.pi)<0.1):
                 # Robot tipped backwards
                 self.Print("Back recovery",'debug1')
                 result = self.BackTipRecovery()
@@ -1511,7 +1497,7 @@ class DW_Controller(object):
             else:
                 result = 1
                 self._fall_count = 0
-        self.RotFlag = 1
+        self.last_seq = "RECOVER"
 
 
     def TipRecovery(self,side):
@@ -1814,6 +1800,269 @@ class DW_Controller(object):
             print(string)
 
 
+    def TestSingles(self,params,Results):
+        # Initialize
+        self._fall_count = 0
+        Slope = 0
+
+        TestConfig = self.SetTestParams(params)
+
+        OutString = self.SetTestString(TestConfig)
+
+        while self._fall_count == 0:
+            self.Print(OutString.format(Slope),'system1')
+            
+            # Reset gravity
+            self.Interface_cb(String('gravec 0 0'))
+            
+            # Reset robot
+            self.Interface_cb(String('reset'))
+
+            # Sit down
+            # Extend hands accordingly
+            if Slope<0 and TestConfig['seq'] == "FWD":
+                self.SitDwnSeq1[17] = self.SitDwnSeq2[17] = -1.0-0.75*Slope/180*math.pi
+                self.SitDwnSeq1[17+6] = self.SitDwnSeq2[17+6] = 1.0+0.75*Slope/180*math.pi
+            self.Interface_cb(String('sit'))
+
+            # Restore sequence
+            self.SitDwnSeq1[17] = self.SitDwnSeq2[17] = -1.0
+            self.SitDwnSeq1[17+6] = self.SitDwnSeq2[17+6] = 1.0
+            
+            rospy.sleep(1)
+
+            # Apply "slope"
+            y,p,r = self.current_ypr()
+            SlopeStr = ("gravec %.4f %.4f" % (y+TestConfig['dyaw'],-Slope*math.pi/180))
+            self.Interface_cb(String(SlopeStr))
+
+            # Crawl/Rotate TestConfig['steps'] steps
+            Dist = 0
+            Pos0 = self.GlobalPos
+            Yaw0 = y
+            T0 = rospy.get_time()
+
+            for x in range(TestConfig['steps']):
+                if TestConfig['seq'] == "FWD":
+                    self.Crawl()
+                elif TestConfig['seq'] == "BWD":
+                    self.BackCrawl()
+                elif TestConfig['seq'] == "SROT":
+                    self.RotOnMudSeq(1)
+                    rospy.sleep(0.5)
+                elif TestConfig['seq'] == "FROT":
+                    self.RotSpotSeq(1)
+                    rospy.sleep(0.5)
+
+                rospy.sleep(0.5)
+                T1 = rospy.get_time()
+
+                # Get distance from origin
+                Pos1 = self.GlobalPos
+                NewDist = math.sqrt((Pos1.x-Pos0.x)**2+(Pos1.y-Pos0.y)**2+(Pos1.z-Pos0.z)**2)
+
+                self.CheckTipping()
+                if self._fall_count > 0:
+                    break
+                if TestConfig['seq'] == "FWD":
+                    if Pos1.x >= Pos0.x:
+                        Dist = NewDist
+                    else:
+                        Dist = -NewDist
+                elif TestConfig['seq'] == "BWD":
+                    if Pos1.x <= Pos0.x:
+                        Dist = NewDist
+                    else:
+                        Dist = -NewDist
+                if Dist<-0.5:
+                    self._fall_count = 1
+                    break
+
+                if TestConfig['seq'].find("ROT") >= 0:
+                    if y<-0.05:
+                        self._fall_count = 1
+                        break
+                else:
+                    break
+
+                # Update gravity to accomodate drift
+                y,p,r = self.current_ypr()
+                SlopeStr = ("gravec %.4f %.4f" % (y+TestConfig['dyaw'],-Slope*math.pi/180))
+                self.Interface_cb(String(SlopeStr))
+
+            # Write down result
+            self.AddResult(Results,TestConfig,Slope,Dist,y-Yaw0,T1-T0)
+
+            # Increase slope
+            if TestConfig['seq'] == "FWD":
+                if TestConfig['inc'] == "UP":
+                    Slope+=1
+                elif TestConfig['inc'] == "DOWN":
+                    Slope-=3
+                else:
+                    Slope+=2
+            elif TestConfig['seq'] == "BWD":
+                if TestConfig['inc'] == "UP":
+                    Slope-=2
+                elif TestConfig['inc'] == "DOWN":
+                    Slope+=2
+                else:
+                    Slope+=2
+            elif TestConfig['seq'].find("ROT") >= 0:
+                Slope+=2
+
+
+    def SetTestParams(self,params):
+        # default values
+        TestConfig = {'seq':'FWD', 'inc':'UP','steps':1,'dyaw':0,
+                      'throttle':1,'legspread':0.5,'pelheight':0.5,
+                      'frotknee':1,'fric':0.8,'damping':0}
+
+        for k,v in params.iteritems():
+            if k == "seq":
+                TestConfig['seq'] = v.upper()
+                if TestConfig['seq'].find("ROT") >= 0:
+                    # Doing rotation test
+                    TestConfig['steps'] = 1
+            elif k == "inc":
+                TestConfig['inc'] = v
+                if TestConfig['inc'] == "DOWN":
+                    TestConfig['dyaw'] = math.pi
+                elif TestConfig['inc'] == "LEFT":
+                    TestConfig['dyaw'] = -math.pi/2
+                elif TestConfig['inc'] == "RIGHT":
+                    TestConfig['dyaw'] = math.pi/2
+            elif k == "throttle":
+                TestConfig['throttle'] = v
+                self.Interface_cb(String('throttle %s %.4f' % (TestConfig['seq'], TestConfig['throttle'])))
+            elif k == "legspread":
+                TestConfig['legspread'] = v
+                self.Interface_cb(String('legspread %.2f' % TestConfig['legspread']))
+            elif k == "pelheight":
+                TestConfig['pelheight'] = v
+                self.Interface_cb(String('pelvisheight %.2f' % TestConfig['pelheight']))
+            elif k == "frotknee":
+                TestConfig['frotknee'] = v
+                self.Interface_cb(String('frknee %.2f' % TestConfig['frotknee']))
+            elif k == "steps":
+                TestConfig['steps'] = v
+
+        return TestConfig
+
+
+    def SetTestString(self,Config):
+        TestConfig = {'seq':'FWD', 'inc':'UP','steps':1,'dyaw':0,
+        'throttle':1,'legspread':0.5,
+                      'pelheight':0.5,'frotknee':1,'fric':0.8,'damping':0}
+
+        if Config['seq'].find("ROT") >= 0:
+            TestStr = "Rotating "
+            if Config['seq'] == "SROT":
+                TestStr+="slow "
+            elif Config['seq'] == "FROT":
+                TestStr+="fast "
+
+            if Config['inc'] == "UP":
+                TestStr+="inclined backwards"
+            elif Config['inc'] == "DOWN":
+                TestStr+="inclined forward"
+            elif Config['inc'] == "LEFT":
+                TestStr+="inclined left"
+            elif Config['inc'] == "RIGHT":
+                TestStr+="inclined right"
+            TestStr+=" {} degrees "
+        else:
+            TestStr = "Crawling "+("%d" % Config['steps'])+" steps "
+            TestStr += Config['seq'] + " on a slope of"
+            if Config['inc'] == "LEFT":
+                TestStr+=" {} degrees inclined left "
+            elif Config['inc'] == "RIGHT":
+                TestStr+=" {} degrees inclined right "
+            else:
+                TestStr+=" {} degrees "
+
+            TestStr+="(TH = %.2f, " % Config['throttle']
+            TestStr+="LS = %.2f, " % Config['legspread']
+            TestStr+="PH = %.2f, " % Config['pelheight']
+            TestStr+="KE = %.2f, " % Config['frotknee']
+            TestStr+="MU = %.2f, " % Config['fric']
+            TestStr+="DA = %.2f)" % Config['damping']
+
+        return TestStr
+
+    
+    def AddResult(self,Results,Config,Slope,Dist,dYaw,dT):
+        ThisRes = {'Seq':Config['seq'],
+                   'Inc':Config['inc'],
+                   'Steps':Config['steps'],
+                   'Thr':Config['throttle'],
+                   'LegS':Config['legspread'],
+                   'PelH':Config['pelheight'],
+                   'FRKnee':Config['frotknee'],
+                   'Fric':Config['fric'],
+                   'Damp':Config['damping'],
+                   'Slope':Slope,
+                   'dPos':Dist,
+                   'dYaw':dYaw,
+                   'dT':dT}
+        Results.append(ThisRes)
+
+
+    def Test1(self):
+        # Test FWD/BWD sequences going up/downhill with different throttles and 2 stance widths
+        Results = []
+
+        NumSteps = 1
+        LegSpread = [0, 1]
+        Throttles = [0.5, 1, 2, 4]
+        for ls in LegSpread:
+            for thr in Throttles:
+                params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+
+                params = {'seq':"BWD", 'type':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'type':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+        
+        stream = file('Test1Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
+        # Results = []
+        # res_file = file('TurnTest.txt','w')
+        # res_str = "Rotation: {0}, Knee extention: {1}, Throttle: {2} \n"
+        # Nthrot = 5;
+        # Nextent = 10;
+        # throt = linspace(0.5,1.5,Nthrot);
+        # ext = linspace(0,1,Nextent);
+        # Nturn = 10;
+        # # Test FWD sequence going downhill
+        # n = 1
+        # for i in throt:
+        #     self.Interface_cb(String('throttle FROT %.4f' % i))
+        #     for j in ext:
+        #         self.Interface_cb(String('frknee %.4f' % j))
+        #         self.Interface_cb(String('reset'))
+        #         self.Interface_cb(String('sit'))
+        #         for k in xrange(0,Nturn):
+        #             y,p,r = self.current_ypr()
+        #             self.Interface_cb(String('rot 1'))
+        #             rospy.sleep(0.5)                    
+        #             yn,pn,rn = self.current_ypr()
+        #             d_yaw = self.DeltaAngle(y,yn)
+        #             res_file.write(res_str.format(d_yaw,j,i))
+        #             stdout.write("\r done %d out of %d" % (n,Nthrot*Nextent*Nturn))
+        #             stdout.flush()
+        #             n = n+1
+        # res_file.close()
+        # return
+
+
     def Test2(self):
         Results = []
 
@@ -1839,6 +2088,7 @@ class DW_Controller(object):
         # Reset gravity
         self.Interface_cb(String('gravec 0 0'))
 
+
     def Test3(self):
         Results = []
 
@@ -1862,279 +2112,6 @@ class DW_Controller(object):
         # Reset gravity
         self.Interface_cb(String('gravec 0 0'))
 
-    def Test5(self):
-        Results = []
-
-        ls = 0.5
-        th = 1
-
-        # Test fast rotation
-        params = {'seq':"FROT", 'type':"UP", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"FROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"FROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"FROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-
-        # Test slow rotation
-        params = {'seq':"SROT", 'type':"UP", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"SROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"SROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-        params = {'seq':"SROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
-        self.TestSingles(params,Results)
-
-        stream = file('Test5Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
-
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
-
-    def Test6(self):
-        Results = []
-
-        ls = 0.5
-        th = 1
-
-        LegSpread = [0, 0.25, 0.5, 0.75, 1]
-
-        for ls in LegSpread:
-            # Test FWD
-            params = {'seq':"FWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
-            self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
-            self.TestSingles(params,Results)
-            
-            # Test BWD
-            params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
-            self.TestSingles(params,Results)
-
-        stream = file('Test6Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
-
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
-
-    def Test7(self):
-        Results = []
-
-        ls = 0.5
-        th = 1
-
-        pelvisheight = [0, 0.25, 0.5, 0.75, 1]
-
-        for ls in pelvisheight:
-            # Test BWD
-            params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'pelvisheight':ls}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'pelvisheight':ls}
-            self.TestSingles(params,Results)
-
-        stream = file('Test7Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
-
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
-    def TestSingles(self,params,Results):
-        # Initialize
-        NumSteps = 4
-        self._fall_count = 0
-        Slope = 0
-
-        # default values
-        seq = "FWD"
-        incline = "UP"
-        throttle = 1
-        legspread = 0.5
-        dyaw = 0
-        PelvisHeight = 0
-        for k,v in params.iteritems():
-            if k == "seq":
-                seq = v.upper()
-                if seq.find("ROT") >= 0:
-                    # Doing rotation test
-                    NumSteps = 1
-            elif k == "type":
-                incline = v
-            elif k == "throttle":
-                throttle = v
-                self.Interface_cb(String('throttle %s %.4f' % (seq, throttle)))
-            elif k == "legspread":
-                legspread = v
-                self.Interface_cb(String('legspread %.2f' % legspread))
-            elif k == "pelvisheight":
-                PelvisHeight = v
-                self.Interface_cb(String('pelvisheight %.2f' % PelvisHeight))
-                pass
-
-
-
-        if seq.find("ROT") >= 0:
-            TestStr = "Rotating "
-            if seq == "SROT":
-                vel = 0
-                TestStr+="slow ("
-            elif seq == "FROT":
-                vel = 1
-                TestStr+="fast ("
-            TestStr+=("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)
-            if incline == "UP":
-                TestStr+=") inclined backwards"
-            elif incline == "DOWN":
-                dyaw = math.pi
-                TestStr+=") inclined forward"
-            elif incline == "LEFT":
-                dyaw = -math.pi/2
-                TestStr+=") inclined left"
-            elif incline == "RIGHT":
-                dyaw = math.pi/2
-                TestStr+=") inclined right"
-            dTestStr =" {} degrees"
-        else:
-            TestStr = "Crawling "+("%d" % NumSteps)+" steps "+seq+" ("+("thr = %.2f" % throttle)+" "+("ls = %.2f" % legspread)+("pelvis height = %.2f" % PelvisHeight)+") on a slope of "
-            if incline == "LEFT":
-                dyaw = -math.pi/2
-                dTestStr = "{} degrees inclined left"
-            elif incline == "RIGHT":
-                dyaw = math.pi/2
-                dTestStr = "{} degrees inclined right"
-            else:
-                dTestStr ="{} degrees"
-
-        while self._fall_count == 0:
-            self.Print(TestStr+dTestStr.format(Slope),'system1')
-            # Reset gravity
-            self.Interface_cb(String('gravec 0 0'))
-            # Reset robot
-            self.Interface_cb(String('reset'))
-
-            # Sit down
-            # Extend hands accordingly
-            if Slope<0 and seq == "FWD":
-                self.SitDwnSeq1[17] = self.SitDwnSeq2[17] = -1.0-0.75*Slope/180*math.pi
-                self.SitDwnSeq1[17+6] = self.SitDwnSeq2[17+6] = 1.0+0.75*Slope/180*math.pi
-            self.Interface_cb(String('sit'))
-            # Restore sequence
-            self.SitDwnSeq1[17] = self.SitDwnSeq2[17] = -1.0
-            self.SitDwnSeq1[17+6] = self.SitDwnSeq2[17+6] = 1.0
-            self.RotFlag = 1
-
-            rospy.sleep(1)
-            # Apply "slope"
-            y,p,r = self.current_ypr()
-            SlopeStr = ("gravec %.4f %.4f" % (y+dyaw,-Slope*math.pi/180))
-            self.Interface_cb(String(SlopeStr))
-
-            # Crawl/Rotate NumSteps steps
-            Dist = 0
-            T0 = rospy.get_time()
-            for x in range(NumSteps):
-                if seq == "FWD":
-                    self.Crawl()
-                elif seq == "BWD":
-                    self.BackCrawl()
-                elif seq == "SROT":
-                    self.RotOnMudSeq(1)
-                    rospy.sleep(0.5)
-                elif seq == "FROT":
-                    self.RotSpotSeq(1)
-                    rospy.sleep(0.5)
-
-                rospy.sleep(0.5)
-                T1 = rospy.get_time()
-
-                # Get distance from origin
-                NewDist = math.sqrt(self.GlobalPos.x**2+self.GlobalPos.y**2+self.GlobalPos.z**2)
-
-                self.CheckTipping()
-                if self._fall_count == 0:
-                    if seq == "FWD":
-                        if self.GlobalPos.x >= 0:
-                            Dist = NewDist
-                        else:
-                            Dist = -NewDist
-
-                        if Dist<-1:
-                            self._fall_count = 1
-                            break
-                    elif seq == "BWD":
-                        if self.GlobalPos.x <= 0:
-                            Dist = NewDist
-                        else:
-                            Dist = -NewDist
-
-                        if Dist<0:
-                            self._fall_count = 1
-                            break
-                else:
-                    break
-
-                # Update gravity to accomodate drift
-                y,p,r = self.current_ypr()
-                if seq.find("ROT") >= 0:
-                    if y<0:
-                        self._fall_count = 1
-                        break
-                SlopeStr = ("gravec %.4f %.4f" % (y+dyaw,-Slope*math.pi/180))
-                self.Interface_cb(String(SlopeStr))
-
-            # Write down result
-            Results.append([['sequence',seq],['incline',incline],['throttle',throttle],['legspread',legspread],['pelvisheight',PelvisHeight],['slope',Slope],['yaw',y],['Distance',Dist],
-                ['time',T1-T0],['avg_vel',Dist/(T1-T0)]])
-
-            # Increase slope
-            if seq == "FWD":
-                if incline == "UP":
-                    Slope+=1
-                elif type == "DOWN":
-                    Slope-=3
-                else:
-                    Slope+=2
-            elif seq == "BWD":
-                if incline == "UP":
-                    Slope-=2
-                elif type == "DOWN":
-                    Slope+=2
-                else:
-                    Slope+=2
-            elif seq.find("ROT") >= 0:
-                Slope+=2
-
-    def Test1(self):
-        Results = []
-        res_file = file('TurnTest.txt','w')
-        res_str = "Rotation: {0}, Knee extention: {1}, Throttle: {2} \n"
-        Nthrot = 5;
-        Nextent = 10;
-        throt = linspace(0.5,1.5,Nthrot);
-        ext = linspace(0,1,Nextent);
-        Nturn = 10;
-        # Test FWD sequence going downhill
-        n = 1
-        for i in throt:
-            self.Interface_cb(String('throttle FROT %.4f' % i))
-            for j in ext:
-                self.Interface_cb(String('frknee %.4f' % j))
-                self.Interface_cb(String('reset'))
-                self.Interface_cb(String('sit'))
-                for k in xrange(0,Nturn):
-                    y,p,r = self.current_ypr()
-                    self.Interface_cb(String('rot 1'))
-                    rospy.sleep(0.5)                    
-                    yn,pn,rn = self.current_ypr()
-                    d_yaw = self.DeltaAngle(y,yn)
-                    res_file.write(res_str.format(d_yaw,j,i))
-                    stdout.write("\r done %d out of %d" % (n,Nthrot*Nextent*Nturn))
-                    stdout.flush()
-                    n = n+1
-        res_file.close()
-        return
 
     def Test4(self):
         set_mu_srv = rospy.ServiceProxy('/SetMu', SetFric)
@@ -2198,9 +2175,90 @@ class DW_Controller(object):
         return
 
             
+    def Test5(self):
+        Results = []
+
+        ls = 0.5
+        th = 1
+
+        # Test fast rotation
+        params = {'seq':"FROT", 'type':"UP", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"FROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"FROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"FROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+
+        # Test slow rotation
+        params = {'seq':"SROT", 'type':"UP", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"SROT", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"SROT", 'type':"DOWN", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+        params = {'seq':"SROT", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+        self.TestSingles(params,Results)
+
+        stream = file('Test5Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
 
 
-    def interrupted(self,signum, frame):
+    def Test6(self):
+        Results = []
+
+        ls = 0.5
+        th = 1
+
+        LegSpread = [0, 0.25, 0.5, 0.75, 1]
+
+        for ls in LegSpread:
+            # Test FWD
+            params = {'seq':"FWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+            self.TestSingles(params,Results)
+            params = {'seq':"FWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+            self.TestSingles(params,Results)
+            
+            # Test BWD
+            params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'legspread':ls}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'legspread':ls}
+            self.TestSingles(params,Results)
+
+        stream = file('Test6Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
+
+    def Test7(self):
+        Results = []
+
+        ls = 0.5
+        th = 1
+
+        pelvisheight = [0, 0.25, 0.5, 0.75, 1]
+
+        for ls in pelvisheight:
+            # Test BWD
+            params = {'seq':"BWD", 'type':"LEFT", 'throttle':th, 'pelvisheight':ls}
+            self.TestSingles(params,Results)
+            params = {'seq':"BWD", 'type':"RIGHT", 'throttle':th, 'pelvisheight':ls}
+            self.TestSingles(params,Results)
+
+        stream = file('Test7Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
+
+    def Alarm(self,signum, frame):
         "called when alarm times out"
         if self.MessageNum == 1:
             Text = '"All the simulations finished running"'
@@ -2243,7 +2301,7 @@ if __name__=='__main__':
     DW.CloseHands()
     rospy.sleep(0.1)
 
-    signal.signal(signal.SIGALRM, DW.interrupted)
+    signal.signal(signal.SIGALRM, DW.Alarm)
 
     while True:
         comm = raw_input("\033[92mEnter command: \033[0m")
