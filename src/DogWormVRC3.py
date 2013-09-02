@@ -176,7 +176,7 @@ class DW_Controller(object):
         self.count_total = 0
         self.count_tipping = 0
 
-        self.gait_params = {'Slope':0.0,'LegSpread':0.0,'PelvisHeight':0.0,'FRotKnee':1.0}
+        self.gait_params = {'Slope':0.0,'LegSpread':0.0,'PelvisHeight':0.0,'FRotKnee':1.0,'MaxRecover':1}
         self.LoadPoses()
 
     ##################################################################
@@ -455,6 +455,8 @@ class DW_Controller(object):
                 Parameters.append(MotionType)
                 TestsList = Command.split(" then")
 
+                Temp = self.gait_params['MaxRecover']
+                self.gait_params['MaxRecover'] = 0
                 for item in TestsList:
                     print item
                     CommParted = item.split(" ")
@@ -489,6 +491,7 @@ class DW_Controller(object):
                         if TestID == 7:
                             self.Test7()
 
+                self.gait_params['MaxRecover'] = Temp
                 signal.alarm(int(1))
 
             if Command.find(self.Commands[24][0]) == 0: ########### COMMANDS ###########
@@ -597,6 +600,7 @@ class DW_Controller(object):
 
         elif MotionType == 6: ################ RECOVER ################
             self.Print("Recovering after tipping...",'comm_out')
+            self._fall_count = 0
             if self.CheckTipping():
                 self.Print("SUCCESS!!\n",'comm_out')
             else:
@@ -1475,33 +1479,47 @@ class DW_Controller(object):
             R,P,Y = self.RS._orientation.GetRPY()
 
             self.Print(('Check Tipping r=',r,"R=",R,"p=",p,"P=",P),'debug1')
-            # if abs(p)>0.4*math.pi or abs(r)>0.8*math.pi:
+
+            doRecover = ""
             if  P>=0.8:
                 self.Print("Front recovery",'debug1')
-                result = self.FrontTipRecovery()
+                doRecover = "FRONT"
             elif (self.last_seq == "FWD" and (abs(p)>0.4*math.pi or abs(r)>0.8*math.pi)) or (self.last_seq == "BWD" and abs(r+math.pi)<0.1):
                 # Robot tipped backwards
                 self.Print("Back recovery",'debug1')
-                result = self.BackTipRecovery()
-                self.CurSeqStep2 = 0########
-                self.CurSeqStep = 0###############
-
+                doRecover = "BACK"
             elif r>math.pi/4:
                 # Robot tipped to the right
-                result = self.TipRecovery("right")
-                self.CurSeqStep2 = 0########
-                self.CurSeqStep = 0###############
                 self.Print("Right recovery",'debug1')
+                doRecover = "RIGHT"
             elif r<-math.pi/4:
                 # Robot tipped to the left
-                result = self.TipRecovery("left")
-                self.CurSeqStep2 = 0########
-                self.CurSeqStep = 0###############
                 self.Print("Left recovery",'debug1')
+                doRecover = "LEFT"
             else:
                 result = 1
                 self._fall_count = 0
-        self.last_seq = "RECOVER"
+
+            if self._fall_count <= self.gait_params['MaxRecover'] or self.gait_params['MaxRecover'] == -1:
+                if doRecover != "":
+                    self.CurSeqStep2 = 0########
+                    self.CurSeqStep = 0###############
+                    self.last_seq = "RECOVER"
+
+                if doRecover == "FRONT":
+                    result = self.FrontTipRecovery()
+                elif doRecover == "BACK":
+                    result = self.BackTipRecovery()
+                elif doRecover == "RIGHT":
+                    result = self.TipRecovery("right")
+                elif doRecover == "LEFT":
+                    result = self.TipRecovery("left")
+
+                if result == 1:
+                    self._fall_count = 0
+            else:
+                result = -1
+                self.Print("Reached maximum recover attempts. Giving up.",'debug1')
 
 
     def TipRecovery(self,side):
@@ -1796,7 +1814,7 @@ class DW_Controller(object):
 
 
     def Print(self,string,orig):
-        Verbosity = 1
+        Verbosity = 3
 
         VerbLevels = {'system':0, 'system1':1, 'system2':2, 'comm_out':2, 'debug1':3, 'debug2':4, 'comm_in':4, 'poses':4}
 
