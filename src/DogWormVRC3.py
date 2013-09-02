@@ -19,11 +19,13 @@ import tf
 from sensor_msgs.msg import JointState
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Vector3
+from std_msgs.msg import Float64
+
 from numpy import zeros, array, linspace, arange
 import numpy as np
 from JointController import JointCommands_msg_handler
 from JointController import hand_joint_controller
-from robot_state import robot_state
+from robot_state import robot_state, Contact
 from PW.msg import Status
 from atlas_msgs.msg import AtlasState
 from math import ceil
@@ -94,10 +96,10 @@ class DW_Controller(object):
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
         self.set_g_srv = rospy.ServiceProxy('/SetG', SetG)
         self.last_seq = ""
+        self._contacts = {'l_hand':Contact(100,10),'r_hand':Contact(100,10),'l_foot':Contact(100,10),'r_foot':Contact(100,10)}
 
         self._stat_pub = rospy.Publisher('/PW/status',Status)
         self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
-
         self.MessageNum = 1
 
         # Commands
@@ -448,7 +450,9 @@ class DW_Controller(object):
                 y,p,r = self.current_ypr()
                 R,P,Y = self.RS._orientation.GetRPY()
                 self.Print("The robot\'s orientation is: "+BLUE+("Yaw = %.2f(%.2f), Pitch = %.2f(%.2f), Roll = %.2f(%.2f)" % (y,Y,p,P,r,R))+END,'system1')
-
+                self.Print("Contact status is: ",'system1')
+                for name, obj in self._contacts.iteritems():
+                    self.Print(name+": "+BLUE+str(obj.GetState())+END,'system1')
             String = self.Commands[23][0].partition("[")[0]
             if Command.find(String) == 0: ################ TEST ################
                 MotionType = -1
@@ -680,7 +684,8 @@ class DW_Controller(object):
         self.RS.UpdateState(msg)
         self.IMU_mon.get_contact(msg)
         self.IMU_mon.imu_manipulate(msg)
-
+        for name ,obj in self._contacts.iteritems():
+            obj.update(self.RS.GetForce(name))
 
     def Odom_cb(self,msg):
         if 1000 <= self._counter: 
