@@ -171,7 +171,7 @@ class DW_Controller(object):
         self.CurSeqStep2 = 0
         self.Throttle = {'FWD': 1, 'BWD': 1, 'FROT': 1, 'SROT': 1}
 
-        self.Responses = {'bearing':0, 'slope':0}
+        self.Responses = {'bearing':0, 'slope':0, 'backroll':0}
         # self.Responses = {'bearing':0, 'ftorsotilt':0, 'fpitch':0}
         self.DesOri = 0
 
@@ -463,7 +463,6 @@ class DW_Controller(object):
                 Temp = self.gait_params['MaxRecover']
                 self.gait_params['MaxRecover'] = 0
                 for item in TestsList:
-                    print item
                     CommParted = item.split(" ")
                     TestID = int(CommParted[1])
                     if len(CommParted)==3:
@@ -1056,8 +1055,7 @@ class DW_Controller(object):
                 self.JC.set_gains('r_arm_ely',600,0,30,set_default= False)
                 self.JC.set_gains('l_arm_ely',600,0,30,set_default= False)
 
-            if self.CurSeqStep2 == 3:
-             
+            if self.CurSeqStep2 == 3 and self.Responses['backroll'] == 1:
                 if self.IMU_mon.second_contact == 'arm_r':
                     self.JC.set_gains('r_arm_ely',3000,0,10,set_default= False)
                     self.JC.set_gains('l_arm_ely',1000,0,10,set_default= False)
@@ -1070,7 +1068,7 @@ class DW_Controller(object):
 
             self.Print(('Doing inv. Step seq #',self.CurSeqStep2),'debug2')
 
-            if self.CurSeqStep2 == 1 or self.CurSeqStep2 == 2:
+            if (self.CurSeqStep2 == 1 or self.CurSeqStep2 == 2) and self.Responses['backroll'] == 1:
                 pos = list(self.RS.GetJointPos())
                 pos[2] = -1.3*self.IMU_mon.roll 
                 self.send_pos_traj(list(self.RS.GetJointPos()),pos,0.2,0.01)
@@ -1829,7 +1827,7 @@ class DW_Controller(object):
 
 
     def Print(self,string,orig):
-        Verbosity = 3
+        Verbosity = 1
 
         VerbLevels = {'system':0, 'system1':1, 'system2':2, 'comm_out':2, 'debug1':3, 'debug2':4, 'comm_in':4, 'poses':4}
 
@@ -1871,7 +1869,7 @@ class DW_Controller(object):
             # Apply "slope"
             y,p,r = self.current_ypr()
             SlopeStr = ("gravec %.4f %.4f" % (y+TestConfig['dyaw'],-Slope*math.pi/180))
-            print SlopeStr
+            self.Print(SlopeStr,'debug1')
             self.Interface_cb(String(SlopeStr))
 
             # Crawl/Rotate TestConfig['steps'] steps
