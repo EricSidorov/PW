@@ -2014,6 +2014,8 @@ class DW_Controller(object):
                 TestStr+=" {} degrees inclined left "
             elif Config['inc'] == "RIGHT":
                 TestStr+=" {} degrees inclined right "
+            elif Config['inc'] == "DOWN":
+                TestStr+=" -{} degrees "
             else:
                 TestStr+=" {} degrees "
 
