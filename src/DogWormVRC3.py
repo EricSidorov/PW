@@ -1856,6 +1856,7 @@ class DW_Controller(object):
             # Apply "slope"
             y,p,r = self.current_ypr()
             SlopeStr = ("gravec %.4f %.4f" % (y+TestConfig['dyaw'],-Slope*math.pi/180))
+            print SlopeStr
             self.Interface_cb(String(SlopeStr))
 
             # Crawl/Rotate TestConfig['steps'] steps
@@ -1920,17 +1921,10 @@ class DW_Controller(object):
                 if TestConfig['inc'] == "UP":
                     Slope+=1
                 elif TestConfig['inc'] == "DOWN":
-                    Slope-=3
+                    Slope+=3
                 else:
                     Slope+=2
-            elif TestConfig['seq'] == "BWD":
-                if TestConfig['inc'] == "UP":
-                    Slope-=2
-                elif TestConfig['inc'] == "DOWN":
-                    Slope+=2
-                else:
-                    Slope+=2
-            elif TestConfig['seq'].find("ROT") >= 0:
+            else:
                 Slope+=2
 
 
@@ -1954,6 +1948,13 @@ class DW_Controller(object):
                     TestConfig['dyaw'] = -math.pi/2
                 elif TestConfig['inc'] == "RIGHT":
                     TestConfig['dyaw'] = math.pi/2
+
+                if TestConfig['seq'] == "BWD":
+                    if TestConfig['inc'] == "UP":
+                        TestConfig['dyaw'] = math.pi
+                    if TestConfig['inc'] == "DOWN":
+                        TestConfig['dyaw'] = 0
+
             elif k == "throttle":
                 TestConfig['throttle'] = v
                 self.Interface_cb(String('throttle %s %.4f' % (TestConfig['seq'], TestConfig['throttle'])))
