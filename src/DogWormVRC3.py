@@ -1950,24 +1950,14 @@ class DW_Controller(object):
         for k,v in params.iteritems():
             if k == "seq":
                 TestConfig['seq'] = v.upper()
-                if TestConfig['seq'].find("ROT") >= 0:
-                    # Doing rotation test
-                    TestConfig['steps'] = 1
             elif k == "inc":
-                TestConfig['inc'] = v
+                TestConfig['inc'] = v.upper()
                 if TestConfig['inc'] == "DOWN":
                     TestConfig['dyaw'] = math.pi
                 elif TestConfig['inc'] == "LEFT":
                     TestConfig['dyaw'] = -math.pi/2
                 elif TestConfig['inc'] == "RIGHT":
                     TestConfig['dyaw'] = math.pi/2
-
-                if TestConfig['seq'] == "BWD":
-                    if TestConfig['inc'] == "UP":
-                        TestConfig['dyaw'] = math.pi
-                    if TestConfig['inc'] == "DOWN":
-                        TestConfig['dyaw'] = 0
-
             elif k == "throttle":
                 TestConfig['throttle'] = v
                 self.Interface_cb(String('throttle %s %.4f' % (TestConfig['seq'], TestConfig['throttle'])))
@@ -1982,6 +1972,12 @@ class DW_Controller(object):
                 self.Interface_cb(String('frknee %.2f' % TestConfig['frotknee']))
             elif k == "steps":
                 TestConfig['steps'] = v
+
+        if TestConfig['seq'] == "BWD":
+            if TestConfig['inc'] == "UP":
+                TestConfig['dyaw'] = math.pi
+            if TestConfig['inc'] == "DOWN":
+                TestConfig['dyaw'] = 0
 
         return TestConfig
 
@@ -2055,6 +2051,15 @@ class DW_Controller(object):
         Throttles = [0.5, 1, 2, 4]
         for ls in LegSpread:
             for thr in Throttles:
+                params = {'seq':"BWD", 'type':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'type':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'type':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'type':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+
                 params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                 self.TestSingles(params,Results)
                 params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
@@ -2064,15 +2069,6 @@ class DW_Controller(object):
                 params = {'seq':"FWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                 self.TestSingles(params,Results)
 
-                params = {'seq':"BWD", 'type':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-                params = {'seq':"BWD", 'type':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-                params = {'seq':"BWD", 'type':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-                params = {'seq':"BWD", 'type':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-        
         stream = file('Test1Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
         yaml.dump(Results,stream)
 
