@@ -37,12 +37,18 @@ class cb_joints(object):
         return self._jnt
 
 class Contact(object):
-    def __init__(self,treshold,buf_len):
+    def __init__(self,treshold,buf_len,avg_window = 5):
         self._treshold = treshold
         self._contact = False
         self._buffer = [False]*buf_len
+        self._avg_buffer = [0.0]*avg_window
+        self._avg = 0
     def update(self,force):
-        if np.linalg.norm(force)>=self._treshold:
+        cur = np.linalg.norm(force)
+        self._avg_buffer.append(cur)
+        first = self._avg_buffer.pop(0)
+        self._avg += (cur-first)/len(self._avg_buffer)
+        if self._avg>=self._treshold:
             self._buffer.append(True)
         else:
             self._buffer.append(False)
@@ -53,6 +59,8 @@ class Contact(object):
             self._contact = False
     def GetState(self):
         return self._contact
+    def GetAvg(self):
+        return self._avg
 
 
 class ForceTorque(object):

@@ -21,7 +21,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import Float64
 
-from numpy import zeros, array, linspace, arange
+from numpy import zeros, array, linspace, arange, linalg
 import numpy as np
 from JointController import JointCommands_msg_handler
 from JointController import hand_joint_controller
@@ -96,7 +96,7 @@ class DW_Controller(object):
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
         self.set_g_srv = rospy.ServiceProxy('/SetG', SetG)
         self.last_seq = ""
-        self._contacts = {'l_hand':Contact(100,10),'r_hand':Contact(100,10),'l_foot':Contact(100,10),'r_foot':Contact(100,10)}
+        self._contacts = {'l_hand':Contact(70,10),'r_hand':Contact(70,10),'l_foot':Contact(40,10),'r_foot':Contact(40,10)}
 
         self._stat_pub = rospy.Publisher('/PW/status',Status)
         self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
@@ -452,7 +452,8 @@ class DW_Controller(object):
                 self.Print("The robot\'s orientation is: "+BLUE+("Yaw = %.2f(%.2f), Pitch = %.2f(%.2f), Roll = %.2f(%.2f)" % (y,Y,p,P,r,R))+END,'system1')
                 self.Print("Contact status is: ",'system1')
                 for name, obj in self._contacts.iteritems():
-                    self.Print(name+": "+BLUE+str(obj.GetState())+END,'system1')
+                    self.Print(name+": "+BLUE+str(obj.GetState())+" "+str(obj.GetAvg())+END,'system1')
+                self.Print("Standing: "+BLUE+str(self.IsStanding()),'system1')
             String = self.Commands[23][0].partition("[")[0]
             if Command.find(String) == 0: ################ TEST ################
                 MotionType = -1
@@ -1472,6 +1473,14 @@ class DW_Controller(object):
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
         self.last_seq = "SROT"
 
+    def IsStanding(self):
+        num_contacts = 0
+        for con in self._contacts.values():
+            num_contacts+=int(con.GetState())
+        if num_contacts >= 3:
+            return True
+        return False
+
 
     def CheckTipping(self):
         result = 0
@@ -1484,23 +1493,24 @@ class DW_Controller(object):
             R,P,Y = self.RS._orientation.GetRPY()
 
             self.Print(('Check Tipping r=',r,"R=",R,"p=",p,"P=",P),'debug1')
-
             doRecover = ""
-            if  P>=0.8:
-                self.Print("Front recovery",'debug1')
-                doRecover = "FRONT"
-            elif (self.last_seq == "FWD" and (abs(p)>0.4*math.pi or abs(r)>0.8*math.pi)) or (self.last_seq == "BWD" and abs(r+math.pi)<0.1):
-                # Robot tipped backwards
-                self.Print("Back recovery",'debug1')
-                doRecover = "BACK"
-            elif r>math.pi/4:
-                # Robot tipped to the right
-                self.Print("Right recovery",'debug1')
-                doRecover = "RIGHT"
-            elif r<-math.pi/4:
-                # Robot tipped to the left
-                self.Print("Left recovery",'debug1')
-                doRecover = "LEFT"
+            if not self.IsStanding():
+                if  P>=0.8:
+                    self.Print("Front recovery",'debug1')
+                    doRecover = "FRONT"
+                elif 3*math.pi/4>r>math.pi/4:
+                    # Robot tipped to the right
+                    self.Print("Right recovery",'debug1')
+                    doRecover = "RIGHT"
+                elif -3*math.pi/4<r<-math.pi/4:
+                    # Robot tipped to the left
+                    self.Print("Left recovery",'debug1')
+                    doRecover = "LEFT"
+                #elif (self.last_seq == "FWD" and (abs(p)>0.4*math.pi or abs(r)>0.8*math.pi)) or (self.last_seq == "BWD" and abs(r+math.pi)<0.1):
+                else:
+                    # Robot tipped backwards
+                    self.Print("Back recovery",'debug1')
+                    doRecover = "BACK"
             else:
                 result = 1
                 self._fall_count = 0
