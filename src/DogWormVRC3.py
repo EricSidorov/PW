@@ -1483,11 +1483,27 @@ class DW_Controller(object):
 
     def IsStanding(self):
         num_contacts = 0
-        for con in self._contacts.values():
-            num_contacts+=int(con.GetState())
-        if num_contacts >= 3:
-            return True
-        return False
+
+        if self.last_seq == 'SROT' or self.last_seq == 'FROT':
+            leg_contacts = self._contacts['l_foot'].GetState() + self._contacts['r_foot'].GetState()
+            hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
+            if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
+                return True
+            else:
+                self.Print("Waiting 0.5 secs",'debug2')
+                rospy.sleep(0.5)
+                leg_contacts = self._contacts['l_foot'].GetState() + self._contacts['r_foot'].GetState()
+                hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
+                if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
+                    return True
+                else:
+                   return False
+        else:
+            for con in self._contacts.values():
+                num_contacts+=int(con.GetState())
+            if num_contacts >= 3:
+                return True
+            return False
 
 
     def CheckTipping(self):
