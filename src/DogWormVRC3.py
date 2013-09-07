@@ -2155,6 +2155,31 @@ class DW_Controller(object):
         self.Interface_cb(String('gravec 0 0'))
 
 
+    def Test5(self):
+        # Test FROT sequence with different knee extensions and all inclinations (up/down/left/right)
+        Results = []
+
+        NumSteps = 1
+        thr = 1
+        ls = 0.5
+        KneeExtension = [0, 0.25, 0.5, 0.75, 1]
+        for ke in KneeExtension:
+            params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frknee':ke, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frknee':ke, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frknee':ke, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frknee':ke, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+        
+        stream = file('Test5Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
+
         # Results = []
         # res_file = file('TurnTest.txt','w')
         # res_str = "Rotation: {0}, Knee extention: {1}, Throttle: {2} \n"
