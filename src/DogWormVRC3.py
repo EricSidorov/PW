@@ -95,6 +95,7 @@ class DW_Controller(object):
         self.FALL_LIMIT = 3
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
         self.set_g_srv = rospy.ServiceProxy('/SetG', SetG)
+        self.set_mu_srv = rospy.ServiceProxy('/SetMu', SetFric)
         self.last_seq = ""
         self._contacts = {'l_hand':Contact(70,10),'r_hand':Contact(70,10),'l_foot':Contact(40,10),'r_foot':Contact(40,10)}
 
@@ -131,7 +132,8 @@ class DW_Controller(object):
                          ['help [command]','Provides help on using a command'],
                          ['exit','Exit this console'],
                          ['goto [x] [y] [dir]', 'go to point [x,y], dir=fwd/bwd'],
-                         ['pelvisheight [value]','Set Pelvis height param']]
+                         ['pelvisheight [value]','Set Pelvis height param'],
+                         ['friction [mu]','Set the ground friction coefficient to [mu]']]
 
         self.Gravity = [0,0,-9.81]
         self.GraVecKeep = 0
@@ -515,6 +517,7 @@ class DW_Controller(object):
                         self.Print(com[0]+" - "+com[1],'system1')
                         String = self.Commands[27][0].partition("[")[0]
 
+            String = self.Commands[27][0].partition("[")[0]
             if Command.find(String) == 0: ############### GO TO POINT ###############
                 MotionType = -1
                 point_str = Command.split(" ")[1:]
@@ -525,13 +528,20 @@ class DW_Controller(object):
                     self.Print(("Not enough parameters, required fields: [x] [y] [dir]..."),'system1')
 
             String = self.Commands[28][0].partition("[")[0]
-
             if Command.find(String) == 0: ############## HipHeight ##############
                 MotionType = -1
                 CommParted = Command.partition(String)
                 self.gait_params['PelvisHeight']=float(CommParted[2])
                 self.LoadPoses()
                 self.Print(("PelvisHeight parameter set to: %.2f. Sequences updated." % float(CommParted[2])),'comm_out')
+
+            String = self.Commands[29][0].partition("[")[0]
+            if Command.find(String) == 0: ############## FRICTION ##############
+                MotionType = -1
+                CommParted = Command.partition(String)
+                Mu = float(CommParted[2])
+                self.set_mu_srv(SetFricRequest(Mu,Mu))
+                self.Print(("Ground friction coefficient set to: %.2f" % Mu),'comm_out')
 
         if MotionType == 0:
             self.Print(("Got no command param, aborting..."),'system1')
@@ -1301,7 +1311,7 @@ class DW_Controller(object):
         # 0.5 radians for Speed = 0
         Speed = self.gait_params['FRotKnee']
 
-        knee0 = 1.1+(1-Speed)*0.8
+        knee0 = 1.1+(1-Speed)*0.8 # 1.9 -> 1.1
         hip0 = self.BaseHipZ/2
         arm0 = 1.0
         d_arm = 0.3+0.2*Speed
@@ -1970,6 +1980,9 @@ class DW_Controller(object):
             elif k == "frotknee":
                 TestConfig['frotknee'] = v
                 self.Interface_cb(String('frknee %.2f' % TestConfig['frotknee']))
+            elif k == "fric":
+                TestConfig['fric'] = v
+                self.Interface_cb(String('friction %.2f' % TestConfig['fric']))
             elif k == "steps":
                 TestConfig['steps'] = v
 
@@ -2164,13 +2177,13 @@ class DW_Controller(object):
         ls = 0.5
         KneeExtension = [0, 0.25, 0.5, 0.75, 1]
         for ke in KneeExtension:
-            params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frknee':ke, 'steps': NumSteps}
+            params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
             self.TestSingles(params,Results)
-            params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frknee':ke, 'steps': NumSteps}
+            params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
             self.TestSingles(params,Results)
-            params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frknee':ke, 'steps': NumSteps}
+            params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
             self.TestSingles(params,Results)
-            params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frknee':ke, 'steps': NumSteps}
+            params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
             self.TestSingles(params,Results)
         
         stream = file('Test5Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
