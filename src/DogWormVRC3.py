@@ -2209,6 +2209,40 @@ class DW_Controller(object):
         self.Interface_cb(String('gravec 0 0'))
 
 
+    def Test6(self):
+        # Test FROT/SROT sequences with different throttles and all inclinations (up/down/left/right)
+        Results = []
+
+        NumSteps = 1
+        ke = 0.75
+        ls = 0.5
+        Throttles = [0.5, 1, 2]
+        for thr in Throttles:
+            params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+
+            params = {'seq':"SROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"SROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"SROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"SROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+        
+        stream = file('Test6Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+        yaml.dump(Results,stream)
+
+        # Reset gravity
+        self.Interface_cb(String('gravec 0 0'))
+
+
         # Results = []
         # res_file = file('TurnTest.txt','w')
         # res_str = "Rotation: {0}, Knee extention: {1}, Throttle: {2} \n"
