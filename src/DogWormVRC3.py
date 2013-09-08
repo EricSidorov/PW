@@ -482,20 +482,8 @@ class DW_Controller(object):
                         self.Print(("Running test number %d once..." % TestID),'system1')
 
                     for x in range(Times):
-                        if TestID == 1:
-                            self.Test1()
-                        if TestID == 2:
-                            self.Test2()
-                        if TestID == 3:
-                            self.Test3()
-                        if TestID == 4:
-                            self.Test4()
-                        if TestID == 5:
-                            self.Test5()
-                        if TestID == 6:
-                            self.Test6()                    
-                        if TestID == 7:
-                            self.Test7()
+                        self.Print(("Running test number %d (%d/%d)" % (TestID,x+1,Times)),'system1')                        
+                        self.Test(TestID)
 
                 self.gait_params['MaxRecover'] = Temp
                 signal.alarm(int(1))
@@ -1966,6 +1954,9 @@ class DW_Controller(object):
             else:
                 Slope+=2
 
+            if TestConfig['inc'] == "NONE":
+                break
+
 
     def SetTestParams(self,params):
         # default values
@@ -2031,7 +2022,11 @@ class DW_Controller(object):
                 TestStr+="inclined left"
             elif Config['inc'] == "RIGHT":
                 TestStr+="inclined right"
-            TestStr+=" {} degrees "
+
+            if Config['inc'] == "NONE":
+                TestStr+="on a horizontal plan"
+            else:
+                TestStr+=" {} degrees "
         else:
             TestStr = "Crawling "+("%d" % Config['steps'])+" steps "
             TestStr += Config['seq'] + " on a slope of"
@@ -2044,12 +2039,12 @@ class DW_Controller(object):
             else:
                 TestStr+=" {} degrees "
 
-            TestStr+="(TH = %.2f, " % Config['throttle']
-            TestStr+="LS = %.2f, " % Config['legspread']
-            TestStr+="PH = %.2f, " % Config['pelheight']
-            TestStr+="KE = %.2f, " % Config['frotknee']
-            TestStr+="MU = %.2f, " % Config['fric']
-            TestStr+="DA = %.2f)" % Config['damping']
+        TestStr+="(TH = %.2f, " % Config['throttle']
+        TestStr+="LS = %.2f, " % Config['legspread']
+        TestStr+="PH = %.2f, " % Config['pelheight']
+        TestStr+="KE = %.2f, " % Config['frotknee']
+        TestStr+="MU = %.2f, " % Config['fric']
+        TestStr+="DA = %.2f)" % Config['damping']
 
         return TestStr
 
@@ -2071,24 +2066,40 @@ class DW_Controller(object):
         Results.append(ThisRes)
 
 
-    def Test1(self):
-        # Test FWD/BWD sequences with different throttles, 2 stance widths and all inclinations (up/down/left/right)
+    def Test(self,TestID):
         Results = []
 
-        NumSteps = 1
-        LegSpread = [0, 1]
-        Throttles = [0.5, 1, 2, 4]
-        for ls in LegSpread:
-            for thr in Throttles:
-                params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-                params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-                params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-                params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
+        if TestID == 1:
+            # Test FWD/BWD sequences with different throttles, 2 stance widths and all inclinations (up/down/left/right)
+            NumSteps = 1
+            LegSpread = [0, 1]
+            Throttles = [0.5, 1, 2, 4]
+            for ls in LegSpread:
+                for thr in Throttles:
+                    params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
 
+                    params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"FWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"FWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+
+        elif TestID == 2:
+            # Test FWD/BWD sequences with different stance widths and all inclinations (up/down/left/right)
+            NumSteps = 1
+            thr = 1
+            LegSpread = [0, 0.25, 0.5, 0.75, 1]
+            for ls in LegSpread:
                 params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                 self.TestSingles(params,Results)
                 params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
@@ -2098,145 +2109,109 @@ class DW_Controller(object):
                 params = {'seq':"FWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                 self.TestSingles(params,Results)
 
-        stream = file('Test1Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+                params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+        elif TestID == 3:
+            # Test FWD sequence going downhill with slope respose enabled
+            slope_switch = self.Responses['slope']
+            self.Responses['slope'] = 1
 
-
-    def Test2(self):
-        # Test FWD/BWD sequences with different stance widths and all inclinations (up/down/left/right)
-        Results = []
-
-        NumSteps = 1
-        thr = 1
-        LegSpread = [0, 0.25, 0.5, 0.75, 1]
-        for ls in LegSpread:
+            NumSteps = 2
+            thr = 1
+            ls = 1
             params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
             self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
 
-            params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-        
-        stream = file('Test2Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+            # Reset response
+            self.Responses['slope'] = slope_switch
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+        elif TestID == 4:
+            # Test BWD sequence with different pelvis heights and all inclinations (up/down/left/right)
+            NumSteps = 1
+            thr = 1
+            ls = 0.5
+            PelvisHeight = [0, 0.25, 0.5, 0.75, 1]
+            for ph in PelvisHeight:
+                params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
+        elif TestID == 5:
+            # Test FROT sequence with different knee extensions and all inclinations (up/down/left/right)
+            NumSteps = 1
+            thr = 1
+            ls = 0.5
+            KneeExtension = [0, 0.25, 0.5, 0.75, 1]
+            for ke in KneeExtension:
+                params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-    def Test3(self):
-        # Test FWD sequence going downhill with slope respose enabled
-        Results = []
+        elif TestID == 6:
+            # Test FROT/SROT sequences with different throttles and all inclinations (up/down/left/right)
+            NumSteps = 1
+            ke = 0.75
+            ls = 0.5
+            Throttles = [0.5, 1, 2]
+            for thr in Throttles:
+                params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-        slope_switch = self.Responses['slope']
-        self.Responses['slope'] = 1
+                params = {'seq':"SROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"SROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"SROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"SROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-        NumSteps = 2
-        thr = 1
-        ls = 1
-        params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-        self.TestSingles(params,Results)
-        
-        stream = file('Test3Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+        elif TestID == 7:
+            # Test FROT/SROT sequences with different mu on flat plane
+            NumSteps = 2
+            thr = 1
+            ke = 0.75
+            ls = 0.5
+            damp = 0
+            Friction = [0.2, 0.4, 0.6, 0.8]
+            for fr in Friction:
+                # Reset friction
+                self.Interface_cb(String('friction 0.8'))
+                params = {'seq':"FROT", 'inc':"NONE", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'fric':fr, 'damping':damp, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
-        self.Responses['slope'] = slope_switch
+                # Reset friction
+                self.Interface_cb(String('friction 0.8'))
+                params = {'seq':"SROT", 'inc':"NONE", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'fric':fr, 'damping':damp, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-
-    def Test4(self):
-        # Test BWD sequence with different pelvis heights and all inclinations (up/down/left/right)
-        Results = []
-
-        NumSteps = 1
-        thr = 1
-        ls = 0.5
-        PelvisHeight = [0, 0.25, 0.5, 0.75, 1]
-        for ph in PelvisHeight:
-            params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-        
-        stream = file('Test4Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
-
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
-
-
-    def Test5(self):
-        # Test FROT sequence with different knee extensions and all inclinations (up/down/left/right)
-        Results = []
-
-        NumSteps = 1
-        thr = 1
-        ls = 0.5
-        KneeExtension = [0, 0.25, 0.5, 0.75, 1]
-        for ke in KneeExtension:
-            params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-        
-        stream = file('Test5Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
-
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
-
-
-    def Test6(self):
-        # Test FROT/SROT sequences with different throttles and all inclinations (up/down/left/right)
-        Results = []
-
-        NumSteps = 1
-        ke = 0.75
-        ls = 0.5
-        Throttles = [0.5, 1, 2]
-        for thr in Throttles:
-            params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-
-            params = {'seq':"SROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"SROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"SROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"SROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-        
-        stream = file('Test6Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+            # Reset friction
+            self.Interface_cb(String('friction 0.8'))
+            
+        stream = file('Test'+('%d' % TestID)+'Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
         yaml.dump(Results,stream)
 
         # Reset gravity
