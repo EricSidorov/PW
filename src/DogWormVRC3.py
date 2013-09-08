@@ -1126,55 +1126,6 @@ class DW_Controller(object):
         self.RobotCnfg2[0][2] = 0
 
 
-    # def SlopeResponse(self,Delta):
-    #     # Delta goes from -1 to 1
-    #     # Delta 0 is for 0 degrees
-    #     # Delta 1 is for 10 degrees upslope
-    #     # Delta -1 is for 40 degrees downslope
-    #     if Delta > 0:
-    #         dTorso = 0
-    #         HHDist = 0.7 + 0.3*Delta
-    #         HFDist = 0.3 - 0.3*Delta
-    #     else:
-    #         dTorso = 0.5*Delta
-    #         HHDist = 0.7
-    #         HFDist = 0.3 - 1.5*Delta
-
-    #     # Sequence Step 1: Touch ground with pelvis, lift legs
-    #     self.RobotCnfg[0][1] = 1.0+2*dTorso
-    #     self.RobotCnfg[0][7] = self.RobotCnfg[0][7+6] = 2.4-0.6*HFDist
-    #     self.RobotCnfg[0][8] = self.RobotCnfg[0][8+6] = 0.3+0.3*HFDist
-
-    #     # Sequence Step 2: Extend legs
-    #     self.RobotCnfg[1][1] = 0.4+1.5*dTorso
-    #     self.RobotCnfg[1][17] = -0.8-0.4*HHDist-1.2*dTorso
-    #     self.RobotCnfg[1][17+6] = 0.8+0.4*HHDist+1.2*dTorso
-
-    #     # Sequence Step 3: Put legs down, bringing torso forward and raising arms
-    #     self.RobotCnfg[2][1] = 0.3+1.5*dTorso
-    #     self.RobotCnfg[2][16] = self.RobotCnfg[2][16+6] = 0.6+0.3*HHDist # 0
-    #     self.RobotCnfg[2][18] = self.RobotCnfg[2][18+6] = 2.6+0.4*HHDist
-
-    #     # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
-    #     self.RobotCnfg[3][1] = -0.1+0.5*HHDist+1.5*dTorso
-    #     self.RobotCnfg[3][16] = self.RobotCnfg[3][16+6] = 0.8*HHDist+0.3*dTorso # BASE 0.6 # 1
-    #     self.RobotCnfg[3][17] = -1.35-1.2*dTorso
-    #     self.RobotCnfg[3][17+6] = 1.35+1.2*dTorso
-    #     # self.RobotCnfg[3][18] = self.RobotCnfg[3][18+6] = 2.5+0.4*dTorso
-    #     self.RobotCnfg[3][19] = 0.3-1.1*dTorso
-    #     self.RobotCnfg[3][19+6] = -0.3+1.1*dTorso
-
-    #     # Sequence Step 5: Bring pelvis forward, closer to legs
-    #     self.RobotCnfg[4][7] = self.RobotCnfg[4][7+6] = 2.4-0.6*HFDist
-    #     self.RobotCnfg[4][8] = self.RobotCnfg[4][8+6] = 0.3*HFDist
-    #     self.RobotCnfg[4][16] = self.RobotCnfg[4][16+6] = 1.0+0.4*dTorso
-    #     self.RobotCnfg[4][17] = -1.0-0.2*HHDist-1.3*dTorso
-    #     self.RobotCnfg[4][17+6] = 1.0+0.2*HHDist+1.3*dTorso
-    #     # self.RobotCnfg[4][18] = self.RobotCnfg[4][18+6] = 3.0+0.6*dTorso
-    #     self.RobotCnfg[4][19] = 0.05-1.3*dTorso
-    #     self.RobotCnfg[4][19+6] = -0.05+1.3*dTorso
-
-
     # def TiltTorso(self,Delta):
     #     # Delta of 1 is for 8 degrees
     #     # Add gait changes to appropriate step
@@ -1471,27 +1422,38 @@ class DW_Controller(object):
 
     def IsStanding(self):
         num_contacts = 0
+        Result = False
 
+        # Limbs' sensors test
         if self.last_seq == 'SROT' or self.last_seq == 'FROT':
             leg_contacts = self._contacts['l_foot'].GetState() + self._contacts['r_foot'].GetState()
             hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
             if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
-                return True
+                Result = True
             else:
                 self.Print("Waiting 0.5 secs",'debug2')
                 rospy.sleep(0.5)
                 leg_contacts = self._contacts['l_foot'].GetState() + self._contacts['r_foot'].GetState()
                 hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
                 if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
-                    return True
+                    Result = True
                 else:
-                   return False
+                   Result = False
         else:
             for con in self._contacts.values():
                 num_contacts+=int(con.GetState())
             if num_contacts >= 3:
-                return True
-            return False
+                Result = True
+            else:
+                Result = False
+
+        # Previous orientation test
+        if Result == False:
+            pass
+        else:
+            pass
+
+        return Result
 
 
     def CheckTipping(self):
