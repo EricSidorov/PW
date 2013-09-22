@@ -20,7 +20,7 @@ from sensor_msgs.msg import JointState
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import Float64
-
+import os
 from numpy import zeros, array, linspace, arange, linalg
 import numpy as np
 from JointController import JointCommands_msg_handler
@@ -43,7 +43,24 @@ from FricPlugin.srv import *
 import subprocess
 import signal
 
-
+class Logger(object):
+    def __init__(self,dir_path,file_name):
+        self._on = False
+        self.set_path(dir_path,file_name)
+    def append(self,dat):
+        if self._on:
+            f = open(self._path,'a')
+            f.write(str(dat)+'\n')
+            f.close()
+    def Active(self,val):
+        self._on = val
+    def set_path(self,dir_path,file_name):
+        self._dir = os.path.abspath(dir_path)
+        self._file_name = file_name
+        if os.path.exists(self._dir) == False:
+            os.makedirs(self._dir)
+        self._path = os.path.join(self._dir,self._file_name)
+            
 class Interface_tf(object):
     def __init__(self):
         self._TransformListener = tf.TransformListener()
@@ -102,6 +119,7 @@ class DW_Controller(object):
         self._stat_pub = rospy.Publisher('/PW/status',Status)
         self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
         self.MessageNum = 1
+        self._sit_logger = Logger('','sit_down_log.txt')
 
         # Commands
         self.Commands = [['sit','Sit down from standing position'],
@@ -684,6 +702,9 @@ class DW_Controller(object):
         self.IMU_mon.imu_manipulate(msg)
         for name ,obj in self._contacts.iteritems():
             obj.update(self.RS.GetForce(name))
+        acc = [msg.linear_acceleration.x,msg.linear_acceleration.y,msg.linear_acceleration.z]
+        self._sit_logger.append(acc)
+
 
     def Odom_cb(self,msg):
         if 1000 <= self._counter: 
@@ -815,6 +836,7 @@ class DW_Controller(object):
 
 
     def Sit(self,T):
+        self._sit_logger.Active(True)
         self.JC.set_gains("l_arm_mwx",20,0,15)
         self.JC.set_gains("r_arm_mwx",20,0,15)
         self.JC.set_gains("l_arm_elx",50,0,15)
@@ -847,7 +869,7 @@ class DW_Controller(object):
         # self.JC.send_command()
         # rospy.sleep(T*0.2)
         self.last_seq = "SIT"
-
+        self._sit_logger.Active(False)
 
     def DoPath(self,Path):
         for Point in Path:
