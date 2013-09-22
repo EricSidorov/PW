@@ -119,7 +119,6 @@ class DW_Controller(object):
         self._stat_pub = rospy.Publisher('/PW/status',Status)
         self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
         self.MessageNum = 1
-        self._sit_logger = Logger('','sit_down_log.txt')
 
         # Commands
         self.Commands = [['sit','Sit down from standing position'],
@@ -702,8 +701,6 @@ class DW_Controller(object):
         self.IMU_mon.imu_manipulate(msg)
         for name ,obj in self._contacts.iteritems():
             obj.update(self.RS.GetForce(name))
-        acc = [msg.linear_acceleration.x,msg.linear_acceleration.y,msg.linear_acceleration.z]
-        self._sit_logger.append(acc)
 
 
     def Odom_cb(self,msg):
@@ -836,41 +833,42 @@ class DW_Controller(object):
 
 
     def Sit(self,T):
-        self._sit_logger.Active(True)
-        self.JC.set_gains("l_arm_mwx",20,0,15)
-        self.JC.set_gains("r_arm_mwx",20,0,15)
-        self.JC.set_gains("l_arm_elx",50,0,15)
-        self.JC.set_gains("r_arm_elx",50,0,15)
+        ##
+        # self.JC.set_gains("l_arm_mwx",20,0,15)
+        # self.JC.set_gains("r_arm_mwx",20,0,15)
+        # self.JC.set_gains("l_arm_elx",50,0,15)
+        # self.JC.set_gains("r_arm_elx",50,0,15)
+        ##
         pos = copy(self.SitDwnSeq1)
         self.send_pos_traj(self.RS.GetJointPos(),pos,T*0.5,0.005)
         # self.SeqWithBalance(self.RS.GetJointPos(),self.SitDwnSeq1,T*0.3,0.005)
         self.JC.set_pos("l_leg_uay",-0.1)
         self.JC.set_pos("r_leg_uay",-0.1)
-        self.JC.set_gains("l_leg_uay",10,0,5,set_default = False)
-        self.JC.set_gains("r_leg_uay",10,0,5,set_default = False)
-        self.JC.set_gains("l_leg_lax",10,0,5,set_default = False)
-        self.JC.set_gains("r_leg_lax",10,0,5,set_default = False)
+        ##
+        # self.JC.set_gains("l_leg_uay",10,0,5,set_default = False)
+        # self.JC.set_gains("r_leg_uay",10,0,5,set_default = False)
+        # self.JC.set_gains("l_leg_lax",10,0,5,set_default = False)
+        # self.JC.set_gains("r_leg_lax",10,0,5,set_default = False)
+        ##
         self.JC.send_command()
         rospy.sleep(T*0.3)
-        self.JC.set_gains("back_mby",4000,0,10)
-        self.JC.set_gains("l_arm_elx",200,0,3)
-        self.JC.set_gains("r_arm_elx",200,0,3)
-        self.JC.set_gains("l_arm_mwx",100,0,0.2)
-        self.JC.set_gains("r_arm_mwx",100,0,0.2)
-        # self.JC.set_gains("l_leg_uay",50,0,5,set_default = False)
-        # self.JC.set_gains("r_leg_uay",50,0,5,set_default = False)
-        # self.JC.set_gains("l_leg_lax",50,0,5,set_default = False)
-        # self.JC.set_gains("r_leg_lax",50,0,5,set_default = False)
+        ##
+        # self.JC.set_gains("back_mby",4000,0,10)
+        # self.JC.set_gains("l_arm_elx",200,0,3)
+        # self.JC.set_gains("r_arm_elx",200,0,3)
+        # self.JC.set_gains("l_arm_mwx",100,0,0.2)
+        # self.JC.set_gains("r_arm_mwx",100,0,0.2)
+        ##
         self.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq2,T*0.2,0.005)
-        self.JC.set_gains("l_arm_elx",1200,0,3)
-        self.JC.set_gains("r_arm_elx",1200,0,3)
-        self.JC.set_gains("l_arm_mwx",1200,0,10)
-        self.JC.set_gains("r_arm_mwx",1200,0,10)
+        ##
+        # self.JC.set_gains("l_arm_elx",1200,0,3)
+        # self.JC.set_gains("r_arm_elx",1200,0,3)
+        # self.JC.set_gains("l_arm_mwx",1200,0,10)
+        # self.JC.set_gains("r_arm_mwx",1200,0,10)
+        ##
         # self.JC.send_command()
         # rospy.sleep(T*0.2)
         self.last_seq = "SIT"
-        self._sit_logger.Active(False)
-
     def DoPath(self,Path):
         for Point in Path:
             pass# self.GoToPoint(Point)
