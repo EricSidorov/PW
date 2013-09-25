@@ -298,10 +298,11 @@ class PW_seq():
         # Sequence Step 3: Extend arms
         ThisRobotCnfg = copy(self.RobotCnfg2[1][:])
         ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.3#1.4
-        ThisRobotCnfg[17] = -0.2#-0.4#-0.2#-0.6#-0.4
-        ThisRobotCnfg[17+6] = 0.2#0.4#0.2#0.6# 0.4
-        ThisRobotCnfg[17] = -0.4+0.5*PelvisHeight
-        ThisRobotCnfg[17+6] = 0.4-0.5*PelvisHeight
+        ThisRobotCnfg[17] = 0.1#-0.4#-0.2#-0.6#-0.4
+        ThisRobotCnfg[17+6] = -0.1#0.4#0.2#0.6# 0.4
+        # ThisRobotCnfg[17] = -0.4+0.5*PelvisHeight
+        # ThisRobotCnfg[17+6] = 0.4-0.5*PelvisHeight
+        # print ThisRobotCnfg[17], ThisRobotCnfg[17+6]
         ThisRobotCnfg[18] = ThisRobotCnfg[18+6] = 2.9
         ThisRobotCnfg[19] = 0.2
         ThisRobotCnfg[19+6] = -0.2
@@ -319,10 +320,12 @@ class PW_seq():
         ThisRobotCnfg[6] = ThisRobotCnfg[6+6] = -1.8
         ThisRobotCnfg[7] = ThisRobotCnfg[7+6] = 2.6
         ThisRobotCnfg[8] = ThisRobotCnfg[8+6] = 0.2
+        ThisRobotCnfg[16] = ThisRobotCnfg[16+6] = 1.5
         ThisRobotCnfg[17] = -0.6#-0.4#-0.2#-0.6#-0.4
         ThisRobotCnfg[17+6] = 0.6#0.4#0.2#0.6# 0.4
-        ThisRobotCnfg[17] = -1.0+0.5*PelvisHeight
-        ThisRobotCnfg[17+6] = 1.0-0.5*PelvisHeight
+        # ThisRobotCnfg[17] = -1.0+0.5*PelvisHeight
+        # ThisRobotCnfg[17+6] = 1.0-0.5*PelvisHeight
+        # print ThisRobotCnfg[17], ThisRobotCnfg[17+6]
         self.RobotCnfg2.append(ThisRobotCnfg)
         self.StepDur2.append(0.4*T)
 
