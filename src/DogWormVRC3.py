@@ -95,6 +95,7 @@ class DW_Controller(object):
         self.FALL_LIMIT = 3
         self.reset_srv = rospy.ServiceProxy('/gazebo/reset_models', Empty)
         self.set_g_srv = rospy.ServiceProxy('/SetG', SetG)
+        self.set_mu_srv = rospy.ServiceProxy('/SetMu', SetFric)
         self.last_seq = ""
         self._contacts = {'l_hand':Contact(70,10),'r_hand':Contact(70,10),'l_foot':Contact(40,10),'r_foot':Contact(40,10)}
 
@@ -131,7 +132,8 @@ class DW_Controller(object):
                          ['help [command]','Provides help on using a command'],
                          ['exit','Exit this console'],
                          ['goto [x] [y] [dir]', 'go to point [x,y], dir=fwd/bwd'],
-                         ['pelvisheight [value]','Set Pelvis height param']]
+                         ['pelvisheight [value]','Set Pelvis height param'],
+                         ['friction [mu]','Set the ground friction coefficient to [mu]']]
 
         self.Gravity = [0,0,-9.81]
         self.GraVecKeep = 0
@@ -480,20 +482,8 @@ class DW_Controller(object):
                         self.Print(("Running test number %d once..." % TestID),'system1')
 
                     for x in range(Times):
-                        if TestID == 1:
-                            self.Test1()
-                        if TestID == 2:
-                            self.Test2()
-                        if TestID == 3:
-                            self.Test3()
-                        if TestID == 4:
-                            self.Test4()
-                        if TestID == 5:
-                            self.Test5()
-                        if TestID == 6:
-                            self.Test6()                    
-                        if TestID == 7:
-                            self.Test7()
+                        self.Print(("Running test number %d (%d/%d)" % (TestID,x+1,Times)),'system1')                        
+                        self.Test(TestID)
 
                 self.gait_params['MaxRecover'] = Temp
                 signal.alarm(int(1))
@@ -515,6 +505,7 @@ class DW_Controller(object):
                         self.Print(com[0]+" - "+com[1],'system1')
                         String = self.Commands[27][0].partition("[")[0]
 
+            String = self.Commands[27][0].partition("[")[0]
             if Command.find(String) == 0: ############### GO TO POINT ###############
                 MotionType = -1
                 point_str = Command.split(" ")[1:]
@@ -525,13 +516,20 @@ class DW_Controller(object):
                     self.Print(("Not enough parameters, required fields: [x] [y] [dir]..."),'system1')
 
             String = self.Commands[28][0].partition("[")[0]
-
             if Command.find(String) == 0: ############## HipHeight ##############
                 MotionType = -1
                 CommParted = Command.partition(String)
                 self.gait_params['PelvisHeight']=float(CommParted[2])
                 self.LoadPoses()
                 self.Print(("PelvisHeight parameter set to: %.2f. Sequences updated." % float(CommParted[2])),'comm_out')
+
+            String = self.Commands[29][0].partition("[")[0]
+            if Command.find(String) == 0: ############## FRICTION ##############
+                MotionType = -1
+                CommParted = Command.partition(String)
+                Mu = float(CommParted[2])
+                self.set_mu_srv(SetFricRequest(Mu,Mu))
+                self.Print(("Ground friction coefficient set to: %.2f" % Mu),'comm_out')
 
         if MotionType == 0:
             self.Print(("Got no command param, aborting..."),'system1')
@@ -1128,55 +1126,6 @@ class DW_Controller(object):
         self.RobotCnfg2[0][2] = 0
 
 
-    # def SlopeResponse(self,Delta):
-    #     # Delta goes from -1 to 1
-    #     # Delta 0 is for 0 degrees
-    #     # Delta 1 is for 10 degrees upslope
-    #     # Delta -1 is for 40 degrees downslope
-    #     if Delta > 0:
-    #         dTorso = 0
-    #         HHDist = 0.7 + 0.3*Delta
-    #         HFDist = 0.3 - 0.3*Delta
-    #     else:
-    #         dTorso = 0.5*Delta
-    #         HHDist = 0.7
-    #         HFDist = 0.3 - 1.5*Delta
-
-    #     # Sequence Step 1: Touch ground with pelvis, lift legs
-    #     self.RobotCnfg[0][1] = 1.0+2*dTorso
-    #     self.RobotCnfg[0][7] = self.RobotCnfg[0][7+6] = 2.4-0.6*HFDist
-    #     self.RobotCnfg[0][8] = self.RobotCnfg[0][8+6] = 0.3+0.3*HFDist
-
-    #     # Sequence Step 2: Extend legs
-    #     self.RobotCnfg[1][1] = 0.4+1.5*dTorso
-    #     self.RobotCnfg[1][17] = -0.8-0.4*HHDist-1.2*dTorso
-    #     self.RobotCnfg[1][17+6] = 0.8+0.4*HHDist+1.2*dTorso
-
-    #     # Sequence Step 3: Put legs down, bringing torso forward and raising arms
-    #     self.RobotCnfg[2][1] = 0.3+1.5*dTorso
-    #     self.RobotCnfg[2][16] = self.RobotCnfg[2][16+6] = 0.6+0.3*HHDist # 0
-    #     self.RobotCnfg[2][18] = self.RobotCnfg[2][18+6] = 2.6+0.4*HHDist
-
-    #     # Sequence Step 4: Touch ground with arms closer to pelvis and lift pelvis
-    #     self.RobotCnfg[3][1] = -0.1+0.5*HHDist+1.5*dTorso
-    #     self.RobotCnfg[3][16] = self.RobotCnfg[3][16+6] = 0.8*HHDist+0.3*dTorso # BASE 0.6 # 1
-    #     self.RobotCnfg[3][17] = -1.35-1.2*dTorso
-    #     self.RobotCnfg[3][17+6] = 1.35+1.2*dTorso
-    #     # self.RobotCnfg[3][18] = self.RobotCnfg[3][18+6] = 2.5+0.4*dTorso
-    #     self.RobotCnfg[3][19] = 0.3-1.1*dTorso
-    #     self.RobotCnfg[3][19+6] = -0.3+1.1*dTorso
-
-    #     # Sequence Step 5: Bring pelvis forward, closer to legs
-    #     self.RobotCnfg[4][7] = self.RobotCnfg[4][7+6] = 2.4-0.6*HFDist
-    #     self.RobotCnfg[4][8] = self.RobotCnfg[4][8+6] = 0.3*HFDist
-    #     self.RobotCnfg[4][16] = self.RobotCnfg[4][16+6] = 1.0+0.4*dTorso
-    #     self.RobotCnfg[4][17] = -1.0-0.2*HHDist-1.3*dTorso
-    #     self.RobotCnfg[4][17+6] = 1.0+0.2*HHDist+1.3*dTorso
-    #     # self.RobotCnfg[4][18] = self.RobotCnfg[4][18+6] = 3.0+0.6*dTorso
-    #     self.RobotCnfg[4][19] = 0.05-1.3*dTorso
-    #     self.RobotCnfg[4][19+6] = -0.05+1.3*dTorso
-
-
     # def TiltTorso(self,Delta):
     #     # Delta of 1 is for 8 degrees
     #     # Add gait changes to appropriate step
@@ -1301,7 +1250,7 @@ class DW_Controller(object):
         # 0.5 radians for Speed = 0
         Speed = self.gait_params['FRotKnee']
 
-        knee0 = 1.1+(1-Speed)*0.8
+        knee0 = 1.1+(1-Speed)*0.8 # 1.9 -> 1.1
         hip0 = self.BaseHipZ/2
         arm0 = 1.0
         d_arm = 0.3+0.2*Speed
@@ -1473,11 +1422,38 @@ class DW_Controller(object):
 
     def IsStanding(self):
         num_contacts = 0
-        for con in self._contacts.values():
-            num_contacts+=int(con.GetState())
-        if num_contacts >= 3:
-            return True
-        return False
+        Result = False
+
+        # Limbs' sensors test
+        if self.last_seq == 'SROT' or self.last_seq == 'FROT':
+            leg_contacts = self._contacts['l_foot'].GetState() + self._contacts['r_foot'].GetState()
+            hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
+            if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
+                Result = True
+            else:
+                self.Print("Waiting 0.5 secs",'debug2')
+                rospy.sleep(0.5)
+                leg_contacts = self._contacts['l_foot'].GetState() + self._contacts['r_foot'].GetState()
+                hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
+                if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
+                    Result = True
+                else:
+                   Result = False
+        else:
+            for con in self._contacts.values():
+                num_contacts+=int(con.GetState())
+            if num_contacts >= 3:
+                Result = True
+            else:
+                Result = False
+
+        # Previous orientation test
+        if Result == False:
+            pass
+        else:
+            pass
+
+        return Result
 
 
     def CheckTipping(self):
@@ -1940,6 +1916,9 @@ class DW_Controller(object):
             else:
                 Slope+=2
 
+            if TestConfig['inc'] == "NONE":
+                break
+
 
     def SetTestParams(self,params):
         # default values
@@ -1970,6 +1949,9 @@ class DW_Controller(object):
             elif k == "frotknee":
                 TestConfig['frotknee'] = v
                 self.Interface_cb(String('frknee %.2f' % TestConfig['frotknee']))
+            elif k == "fric":
+                TestConfig['fric'] = v
+                self.Interface_cb(String('friction %.2f' % TestConfig['fric']))
             elif k == "steps":
                 TestConfig['steps'] = v
 
@@ -2002,7 +1984,11 @@ class DW_Controller(object):
                 TestStr+="inclined left"
             elif Config['inc'] == "RIGHT":
                 TestStr+="inclined right"
-            TestStr+=" {} degrees "
+
+            if Config['inc'] == "NONE":
+                TestStr+="on a horizontal plan"
+            else:
+                TestStr+=" {} degrees "
         else:
             TestStr = "Crawling "+("%d" % Config['steps'])+" steps "
             TestStr += Config['seq'] + " on a slope of"
@@ -2015,12 +2001,12 @@ class DW_Controller(object):
             else:
                 TestStr+=" {} degrees "
 
-            TestStr+="(TH = %.2f, " % Config['throttle']
-            TestStr+="LS = %.2f, " % Config['legspread']
-            TestStr+="PH = %.2f, " % Config['pelheight']
-            TestStr+="KE = %.2f, " % Config['frotknee']
-            TestStr+="MU = %.2f, " % Config['fric']
-            TestStr+="DA = %.2f)" % Config['damping']
+        TestStr+="(TH = %.2f, " % Config['throttle']
+        TestStr+="LS = %.2f, " % Config['legspread']
+        TestStr+="PH = %.2f, " % Config['pelheight']
+        TestStr+="KE = %.2f, " % Config['frotknee']
+        TestStr+="MU = %.2f, " % Config['fric']
+        TestStr+="DA = %.2f)" % Config['damping']
 
         return TestStr
 
@@ -2042,24 +2028,40 @@ class DW_Controller(object):
         Results.append(ThisRes)
 
 
-    def Test1(self):
-        # Test FWD/BWD sequences with different throttles, 2 stance widths and all inclinations (up/down/left/right)
+    def Test(self,TestID):
         Results = []
 
-        NumSteps = 1
-        LegSpread = [0, 1]
-        Throttles = [0.5, 1, 2, 4]
-        for ls in LegSpread:
-            for thr in Throttles:
-                params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-                params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-                params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
-                params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                self.TestSingles(params,Results)
+        if TestID == 1:
+            # Test FWD/BWD sequences with different throttles, 2 stance widths and all inclinations (up/down/left/right)
+            NumSteps = 1
+            LegSpread = [0, 1]
+            Throttles = [0.5, 1, 2, 4]
+            for ls in LegSpread:
+                for thr in Throttles:
+                    params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
 
+                    params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"FWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"FWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+
+        elif TestID == 2:
+            # Test FWD/BWD sequences with different stance widths and all inclinations (up/down/left/right)
+            NumSteps = 1
+            thr = 1
+            LegSpread = [0, 0.25, 0.5, 0.75, 1]
+            for ls in LegSpread:
                 params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                 self.TestSingles(params,Results)
                 params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
@@ -2069,86 +2071,109 @@ class DW_Controller(object):
                 params = {'seq':"FWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                 self.TestSingles(params,Results)
 
-        stream = file('Test1Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+                params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+        elif TestID == 3:
+            # Test FWD sequence going downhill with slope respose enabled
+            slope_switch = self.Responses['slope']
+            self.Responses['slope'] = 1
 
-
-    def Test2(self):
-        # Test FWD/BWD sequences with different stance widths and all inclinations (up/down/left/right)
-        Results = []
-
-        NumSteps = 1
-        thr = 1
-        LegSpread = [0, 0.25, 0.5, 0.75, 1]
-        for ls in LegSpread:
+            NumSteps = 2
+            thr = 1
+            ls = 1
             params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
             self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"FWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
 
-            params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-        
-        stream = file('Test2Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+            # Reset response
+            self.Responses['slope'] = slope_switch
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
+        elif TestID == 4:
+            # Test BWD sequence with different pelvis heights and all inclinations (up/down/left/right)
+            NumSteps = 1
+            thr = 1
+            ls = 0.5
+            PelvisHeight = [0, 0.25, 0.5, 0.75, 1]
+            for ph in PelvisHeight:
+                params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
+        elif TestID == 5:
+            # Test FROT sequence with different knee extensions and all inclinations (up/down/left/right)
+            NumSteps = 1
+            thr = 1
+            ls = 0.5
+            KneeExtension = [0, 0.25, 0.5, 0.75, 1]
+            for ke in KneeExtension:
+                params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-    def Test3(self):
-        # Test FWD sequence going downhill with slope respose enabled
-        Results = []
+        elif TestID == 6:
+            # Test FROT/SROT sequences with different throttles and all inclinations (up/down/left/right)
+            NumSteps = 1
+            ke = 0.75
+            ls = 0.5
+            Throttles = [0.5, 1, 2]
+            for thr in Throttles:
+                params = {'seq':"FROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"FROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-        slope_switch = self.Responses['slope']
-        self.Responses['slope'] = 1
+                params = {'seq':"SROT", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"SROT", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"SROT", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+                params = {'seq':"SROT", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-        NumSteps = 2
-        thr = 1
-        ls = 1
-        params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-        self.TestSingles(params,Results)
-        
-        stream = file('Test3Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
-        yaml.dump(Results,stream)
+        elif TestID == 7:
+            # Test FROT/SROT sequences with different mu on flat plane
+            NumSteps = 2
+            thr = 1
+            ke = 0.75
+            ls = 0.5
+            damp = 0
+            Friction = [0.2, 0.4, 0.6, 0.8]
+            for fr in Friction:
+                # Reset friction
+                self.Interface_cb(String('friction 0.8'))
+                params = {'seq':"FROT", 'inc':"NONE", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'fric':fr, 'damping':damp, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-        # Reset gravity
-        self.Interface_cb(String('gravec 0 0'))
-        self.Responses['slope'] = slope_switch
+                # Reset friction
+                self.Interface_cb(String('friction 0.8'))
+                params = {'seq':"SROT", 'inc':"NONE", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'fric':fr, 'damping':damp, 'steps': NumSteps}
+                self.TestSingles(params,Results)
 
-
-    def Test4(self):
-        # Test BWD sequence with different pelvis heights and all inclinations (up/down/left/right)
-        Results = []
-
-        NumSteps = 1
-        thr = 1
-        ls = 0.5
-        PelvisHeight = [0, 0.25, 0.5, 0.75, 1]
-        for ph in PelvisHeight:
-            params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-            params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'pelheight':ph, 'steps': NumSteps}
-            self.TestSingles(params,Results)
-        
-        stream = file('Test4Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
+            # Reset friction
+            self.Interface_cb(String('friction 0.8'))
+            
+        stream = file('Test'+('%d' % TestID)+'Res_'+strftime("%m_%d_%H_%M",gmtime())+'.yaml','w')        
         yaml.dump(Results,stream)
 
         # Reset gravity
