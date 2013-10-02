@@ -47,6 +47,17 @@ class Logger(object):
     def __init__(self,dir_path,file_name):
         self._on = False
         self.set_path(dir_path,file_name)
+        self.format_str = ''
+    def set_format(self,format_str):
+        self.format_str = format_str
+    def log(self,args):
+        try:
+            entry = self.format_str.format(*args)
+            self.append(entry)
+        except IndexError:
+            print('logging error: not enough arguments, nothing was logged')
+            return
+
     def append(self,dat):
         if self._on:
             f = open(self._path,'a')
@@ -59,7 +70,13 @@ class Logger(object):
         self._file_name = file_name
         if os.path.exists(self._dir) == False:
             os.makedirs(self._dir)
-        self._path = os.path.join(self._dir,self._file_name)
+        self._path = os.path.join(self._dir,self._file_name+'.log')
+        k = 1
+        while os.path.exists(self._path):
+            self._file_name=file_name+str(k)
+            self._path = os.path.join(self._dir,self._file_name+'.log')
+            k+=1
+
             
 class Interface_tf(object):
     def __init__(self):
@@ -200,9 +217,25 @@ class DW_Controller(object):
         self.gait_params = {'Slope':0.0,'LegSpread':0.0,'PelvisHeight':0.0,'FRotKnee':1.0,'MaxRecover':1}
         self.LoadPoses()
 
+        ##################################################################
+        ######################## GoTo logger #############################
+        ##################################################################
+        self.goto_T_start = rospy.Time.now().to_sec()
+        self.goto_falls = 0
+        self.goto_logger = Logger('','goto_log')
+        self.goto_logger.set_format('time: {0} pos: {1[0]} {1[1]} {1[2]} ypr: {2[0]} {2[1]} {2[2]} falls: {3} last_seq: {4}')
+        self.goto_logger.Active(False)
+
     ##################################################################
     ########################### FUNCTIONS ############################
     ##################################################################
+    def log_goto(self):
+        time = rospy.Time.now().to_sec() - self.goto_T_start
+        pos = [self.GlobalPos.x, self.GlobalPos.y, self.GlobalPos.z]
+        y,p,r = self.current_ypr()
+        ori = [y,p,r]
+        self.goto_logger.log([time,pos,ori,self.goto_falls,self.last_seq])
+
 
     def Interface_cb(self,msg):
         CommString = msg.data
@@ -874,95 +907,53 @@ class DW_Controller(object):
             pass# self.GoToPoint(Point)
             
     def GoToPoint(self,Point):
-        self._Point = Point
-        # Calculate distance and orientation to target
+
+        # keep on loggin' in the free world
+        self.goto_falls = 0;
+        self.goto_T_start = rospy.Time.now().to_sec()
+        self.goto_logger.Active(True)
+        
         while (0 == self.GlobalPos):
             rospy.sleep(1)
             self.Print("Waiting for GlobalPos",'system')
-        while self.PerformStep(Point) == 'going':
-            pass
-
-        # DeltaPos = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
-        # Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
-
-        # # Get current orientation
-        # y,p,r = self.current_ypr()
-        # T_ori = math.atan2(DeltaPos[1],DeltaPos[0])
-        # self.DesOri = T_ori
-        # if self._Point[2] == "bwd":
-        #     T_ori += math.pi
-        # # Rotate in place towards target
-        # if abs(self.DeltaAngle(T_ori,y))>0.1:
-        #     self.RotateToOri(T_ori)
-
-        # # Crawl towards target
-        # if self._Point[2] == "fwd":
-        #     self.Crawl()
-        # if self._Point[2] == "bwd":
-        #     self.BackCrawl()
-
-        # self._stuck_counter = 0
-
-
-    def PerformStep(self,point):
-        result = 'going'
-        self.count_total +=1
-        self.Print(('Total_count:', self.count_total),'debug1')
-        # Calculate distance and orientation to target
-        DeltaPos = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
-        Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
-        T_ori = math.atan2(DeltaPos[1],DeltaPos[0])
-        self.DesOri = T_ori
-        if self._Point[2] == "bwd":
-            T_ori += math.pi
-
-        if Distance<0.8:
-            self.Print("Reached Waypoint",'system2')
-            result = 'done'
-        else:
-            y,p,r = self.current_ypr()
-            # Check tipping
-            self.Print(('check tipping'),'debug1')
-            self.CheckTipping()
-
-            # Rotate in place towards target
-            if self._fall_count < self.FALL_LIMIT:
-              # Crawl towards target
-                if self._Point[2] == "fwd":
-                    self.Crawl()
-                if self._Point[2] == "bwd":
-                    self.BackCrawl()
+        status = 'going'
+        # set max recovery attempts 
+        Temp_max_recover = self.gait_params['MaxRecover']
+        self.gait_params['MaxRecover'] = 5
+        while status == 'going':
+            # Calculate distance and orientation to target
+            DeltaPos = [Point[0]-self.GlobalPos.x,Point[1]-self.GlobalPos.y]
+            Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
+            T_ori = math.atan2(DeltaPos[1],DeltaPos[0])
+            self.DesOri = T_ori
+            if Point[2] == "bwd":
+                T_ori += math.pi
+            if Distance<0.8:
+                self.Print("Reached Waypoint",'system2')
+                status = 'done'
+            else:
+                y,p,r = self.current_ypr()
                 Drift = abs(self.DeltaAngle(T_ori,y))
-                if 0.5<Drift<1.4 and Distance>1:
+                if (0.5<Drift<1.4 and Distance>1) or Drift>1.4:
                     self.RotateToOri(T_ori)
-                if Drift>1.4:
-                    self.RotateToOri(T_ori)
-                    # self.BackCrawl()
-                DeltaPos2 = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
+
+              # Crawl towards target
+                if Point[2] == "fwd":
+                    self.Crawl()
+                if Point[2] == "bwd":
+                    self.BackCrawl()
+
+                if not self.IsStanding():
+                    if self.CheckTipping() == -1:
+                        #failed to recover
+                        self.Print(('I fell and i cant get up'),'system')
+                        status = 'failed'
+                DeltaPos2 = [Point[0]-self.GlobalPos.x,Point[1]-self.GlobalPos.y]
                 Distance2 = math.sqrt(DeltaPos2[0]**2+DeltaPos2[1]**2)
-                # if abs(Distance2-Distance)<0.1:
-                #     # self._stuck_counter+=1
-                #     # self.Print(('stuck... D=',(Distance2-Distance)),'system2')
-                #     # if self._stuck_counter >= 2:
-                #         result = 'stuck'
-                        # #dont follow path
-                        # self.Responses['bearing'] = 0
-                        # #go oposite dir
-                        # if self._Point[2] == "bwd":
-                        #     self.Crawl()
-                        # if self._Point[2] == "fwd":
-                        #     self.BackCrawl()
-                        # self.RotSpotSeq(1)
-                        # self.Responses['bearing'] = 1
-                        # self._stuck_counter = 0
-                # else:
-                #     self._stuck_counter = 0
-            # else:
-                # result = 'stuck'
-                # self.Responses['bearing'] = 0
-        return result
-
-
+        # restore max recovery attempts 
+        self.gait_params['MaxRecover'] = Temp_max_recover
+        # stop loggin'
+        self.goto_logger.Active(False)
     def Crawl(self):
         # self.IMU_mon.turned = 0
         if self.Responses['bearing'] == 1:
@@ -1007,6 +998,7 @@ class DW_Controller(object):
         self.GoToSeqStep(len(self.StepDur))
         rospy.sleep(0.2)
         self.last_seq = "FWD"
+        self.log_goto()
 
 
     def BackCrawl(self):
@@ -1032,6 +1024,7 @@ class DW_Controller(object):
         self.GoToBackSeqStep(len(self.StepDur2))
         rospy.sleep(0.2)
         self.last_seq = "BWD"
+        self.log_goto()
 
 
     def GoToSeqStep(self,Step):
@@ -1344,6 +1337,7 @@ class DW_Controller(object):
         rospy.sleep(0.1*T)
 
         self.last_seq = "FROT"
+        self.log_goto()
 
 
     def RotOnMudSeq(self,Delta):
@@ -1439,6 +1433,7 @@ class DW_Controller(object):
         # # pos[2] = -0.5*r
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.6*T,0.01)
         self.last_seq = "SROT"
+        self.log_goto()
 
     def IsStanding(self):
         num_contacts = 0
@@ -1458,7 +1453,11 @@ class DW_Controller(object):
                 if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
                     Result = True
                 else:
-                   Result = False
+                    R,P,Y = self.RS._orientation.GetRPY()
+                    if abs(R) < 0.3:
+                        Result = True
+                    else:
+                        Result = False
         else:
             for con in self._contacts.values():
                 num_contacts+=int(con.GetState())
@@ -1482,13 +1481,13 @@ class DW_Controller(object):
             # Get current orientation
             
             y,p,r = self.current_ypr()
-            self._fall_count += 1
             # R,P,Y = self.RS.GetIMU()
             R,P,Y = self.RS._orientation.GetRPY()
-
             self.Print(('Check Tipping r=',r,"R=",R,"p=",p,"P=",P),'debug1')
             doRecover = ""
             if not self.IsStanding():
+                self._fall_count += 1
+                self.goto_falls += 1
                 if  P>=0.8:
                     self.Print("Front recovery",'debug1')
                     doRecover = "FRONT"
@@ -1505,6 +1504,7 @@ class DW_Controller(object):
                     # Robot tipped backwards
                     self.Print("Back recovery",'debug1')
                     doRecover = "BACK"
+
             else:
                 result = 1
                 self._fall_count = 0
@@ -1523,12 +1523,14 @@ class DW_Controller(object):
                     result = self.TipRecovery("right")
                 elif doRecover == "LEFT":
                     result = self.TipRecovery("left")
+                self.log_goto()
 
                 if result == 1:
                     self._fall_count = 0
             else:
                 result = -1
                 self.Print("Reached maximum recover attempts. Giving up.",'debug1')
+            return result
 
 
     def TipRecovery(self,side):
