@@ -97,11 +97,12 @@ class DW_Controller(object):
         self.set_g_srv = rospy.ServiceProxy('/SetG', SetG)
         self.set_mu_srv = rospy.ServiceProxy('/SetMu', SetFric)
         self.last_seq = ""
-        self._contacts = {'l_hand':Contact(70,10),'r_hand':Contact(70,10),'l_foot':Contact(40,10),'r_foot':Contact(40,10)}
+        self._contacts = {'l_hand':Contact(70,5),'r_hand':Contact(70,5),'l_foot':Contact(40,5),'r_foot':Contact(40,5)}
 
         self._stat_pub = rospy.Publisher('/PW/status',Status)
         self._rpy_pub = rospy.Publisher('/PW_rpy',Vector3)
         self.MessageNum = 1
+
 
         # Commands
         self.Commands = [['sit','Sit down from standing position'],
@@ -172,7 +173,7 @@ class DW_Controller(object):
         self.CurSeqStep = 0
         self.CurSeqStep2 = 0
         self.Throttle = {'FWD': 1, 'BWD': 1, 'FROT': 1, 'SROT': 1}
-
+        self._last_ori = [0,-0.73,0]
         self.Responses = {'bearing':0, 'slope':0, 'backroll':0}
         # self.Responses = {'bearing':0, 'ftorsotilt':0, 'fpitch':0}
         self.DesOri = 0
@@ -903,8 +904,16 @@ class DW_Controller(object):
             y,p,r = self.current_ypr()
             # Check tipping
             self.Print(('check tipping'),'debug1')
-            self.CheckTipping()
-
+            recovered = self.CheckTipping()
+            print recovered
+            if recovered == -1:
+                self.Print("Gave up",'system2')
+                return 'stuck'
+            if self.last_seq == 'RECOVER':
+                if self._Point[2] == "fwd":
+                    self.Crawl()
+                if self._Point[2] == "bwd":
+                    self.BackCrawl()
             # Rotate in place towards target
             if self._fall_count < self.FALL_LIMIT:
               # Crawl towards target
@@ -981,8 +990,10 @@ class DW_Controller(object):
 
         if self.last_seq != "FWD":
             self.Print("Getting ready",'debug2')
-            self.CurSeqStep = 0
+            self.CurSeqStep = 4
             self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],1,0.005)
+            # rospy.sleep(1)
+            self.CheckTipping()
 
         self.GoToSeqStep(len(self.StepDur))
         rospy.sleep(0.2)
@@ -1008,7 +1019,7 @@ class DW_Controller(object):
             self.Print("Getting ready",'debug2')
             self.CurSeqStep2 = 0
             self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg2[self.CurSeqStep2],1,0.005)
-
+            self.CheckTipping()
         self.GoToBackSeqStep(len(self.StepDur2))
         rospy.sleep(0.2)
         self.last_seq = "BWD"
@@ -1272,6 +1283,7 @@ class DW_Controller(object):
         if self.last_seq != "FROT":
             self.Print("Getting ready",'debug2')
             self.send_pos_traj(self.RS.GetJointPos(),pos,1,0.005) 
+            self.CheckTipping()
 
         T=1./self.Throttle['FROT']
         if Delta>0:
@@ -1340,6 +1352,25 @@ class DW_Controller(object):
 
         T=1/self.Throttle['SROT']
 
+        if self.last_seq != "SROT":
+            pos = copy(self.RobotCnfg2[4][:])
+            pos[1] = 0.8
+            pos[4] = 0.1
+            pos[4+6] = -0.1
+            pos[5] = 0.1
+            pos[5+6] = -0.1
+            pos[6] = pos[6+6] = -1.5
+            pos[7] = pos[7+6] = knee0
+            pos[8] = pos[8+6] = 0.7
+            pos[17] = -0.5
+            pos[17+6] = 0.5
+            pos[16] = pos[16+6] = 0.8
+            pos[18] = pos[18+6] = 2.5
+            pos[19] = 1.1
+            pos[19+6] = -1.1
+            self.Print("Getting ready",'debug2')
+            self.send_pos_traj(self.RS.GetJointPos(),pos,1,0.005) 
+            self.CheckTipping()
         # Get into starting position
         pos = copy(self.RobotCnfg2[4][:])
         pos[1] = 0.8
@@ -1430,6 +1461,7 @@ class DW_Controller(object):
             hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
             if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
                 Result = True
+                print 'rot: contacts - true'
             else:
                 self.Print("Waiting 0.5 secs",'debug2')
                 rospy.sleep(0.5)
@@ -1437,21 +1469,30 @@ class DW_Controller(object):
                 hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
                 if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
                     Result = True
+                    print 'rot2: contacts - true'
                 else:
                    Result = False
+                   print 'rot: contacts - false'
         else:
             for con in self._contacts.values():
                 num_contacts+=int(con.GetState())
             if num_contacts >= 3:
                 Result = True
+                print 'contacts - true'
             else:
                 Result = False
+                print 'contacts - false'
 
         # Previous orientation test
+        y,p,r = self.current_ypr()
+        delta = 30*math.pi/180
         if Result == False:
-            pass
+            if abs(p-self._last_ori[1])<=delta and abs(r-self._last_ori[2])<=delta:
+                print 'but orientation is fine, returning true'
+                return True
         else:
-            pass
+            if abs(p-self._last_ori[1])<=delta and abs(r-self._last_ori[2])<=delta:
+                self._last_ori = [y,p,r]
 
         return Result
 
@@ -1466,7 +1507,7 @@ class DW_Controller(object):
             # R,P,Y = self.RS.GetIMU()
             R,P,Y = self.RS._orientation.GetRPY()
 
-            self.Print(('Check Tipping r=',r,"R=",R,"p=",p,"P=",P),'debug1')
+            # self.Print(('Check Tipping r=',r,"R=",R,"p=",p,"P=",P),'debug1')
             doRecover = ""
             if not self.IsStanding():
                 if  P>=0.8:
@@ -1509,6 +1550,7 @@ class DW_Controller(object):
             else:
                 result = -1
                 self.Print("Reached maximum recover attempts. Giving up.",'debug1')
+        return result
 
 
     def TipRecovery(self,side):
@@ -1803,7 +1845,7 @@ class DW_Controller(object):
 
 
     def Print(self,string,orig):
-        Verbosity = 1
+        Verbosity = 4
 
         VerbLevels = {'system':0, 'system1':1, 'system2':2, 'comm_out':2, 'debug1':3, 'debug2':4, 'comm_in':4, 'poses':4}
 
