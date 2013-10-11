@@ -70,12 +70,8 @@ class Logger(object):
         self._file_name = file_name
         if os.path.exists(self._dir) == False:
             os.makedirs(self._dir)
-        self._path = os.path.join(self._dir,self._file_name+'.log')
-        k = 1
-        while os.path.exists(self._path):
-            self._file_name=file_name+str(k)
-            self._path = os.path.join(self._dir,self._file_name+'.log')
-            k+=1
+        self._path = os.path.join(self._dir,self._file_name+'_'+strftime("%m_%d_%H_%M",gmtime())+'.log')
+
 
             
 class Interface_tf(object):
@@ -1908,7 +1904,7 @@ class DW_Controller(object):
                         Dist = NewDist
                     else:
                         Dist = -NewDist
-                if Dist<-0.5:
+                if Dist<0:
                     self._fall_count = 1
                     break
 
