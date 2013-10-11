@@ -865,8 +865,10 @@ class DW_Controller(object):
         ##
         # self.JC.set_gains("l_arm_mwx",20,0,15)
         # self.JC.set_gains("r_arm_mwx",20,0,15)
-        # self.JC.set_gains("l_arm_elx",50,0,15)
-        # self.JC.set_gains("r_arm_elx",50,0,15)
+        self.JC.set_gains("l_arm_shx",10,0,10,set_default = False)
+        self.JC.set_gains("r_arm_shx",10,0,10,set_default = False)
+        self.JC.set_gains("l_arm_elx",10,0,10,set_default = False)
+        self.JC.set_gains("r_arm_elx",10,0,10,set_default = False)
         ##
         pos = copy(self.SitDwnSeq1)
         self.send_pos_traj(self.RS.GetJointPos(),pos,T*0.5,0.005)
@@ -874,21 +876,24 @@ class DW_Controller(object):
         self.JC.set_pos("l_leg_uay",-0.1)
         self.JC.set_pos("r_leg_uay",-0.1)
         ##
-        # self.JC.set_gains("l_leg_uay",10,0,5,set_default = False)
-        # self.JC.set_gains("r_leg_uay",10,0,5,set_default = False)
-        # self.JC.set_gains("l_leg_lax",10,0,5,set_default = False)
-        # self.JC.set_gains("r_leg_lax",10,0,5,set_default = False)
+        self.JC.set_gains("l_leg_uay",10,0,5,set_default = False)
+        self.JC.set_gains("r_leg_uay",10,0,5,set_default = False)
+        self.JC.set_gains("l_leg_lax",10,0,5,set_default = False)
+        self.JC.set_gains("r_leg_lax",10,0,5,set_default = False)
+
+        self.JC.set_gains("l_leg_kny",50,0,15,set_default = False)
+        self.JC.set_gains("r_leg_kny",50,0,15,set_default = False)
+        self.JC.set_gains("l_arm_usy",20,0,15,set_default = False)
+        self.JC.set_gains("r_arm_usy",20,0,15,set_default = False)
         ##
         self.JC.send_command()
-        rospy.sleep(T*0.3)
+        while self.IsStanding() == False:
+            rospy.sleep(0.05)
+        rospy.sleep(T*0.2)
         ##
-        # self.JC.set_gains("back_mby",4000,0,10)
-        # self.JC.set_gains("l_arm_elx",200,0,3)
-        # self.JC.set_gains("r_arm_elx",200,0,3)
-        # self.JC.set_gains("l_arm_mwx",100,0,0.2)
-        # self.JC.set_gains("r_arm_mwx",100,0,0.2)
+        self.JC.reset_gains([7,13,16,17,19,22,23,25])
         ##
-        self.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq2,T*0.2,0.005)
+        self.send_pos_traj(self.RS.GetJointPos(),self.SitDwnSeq2,T*0.5,0.005)
         ##
         # self.JC.set_gains("l_arm_elx",1200,0,3)
         # self.JC.set_gains("r_arm_elx",1200,0,3)

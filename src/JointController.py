@@ -102,7 +102,7 @@ class JointCommands_msg_handler(object):
             n = len(self.JointNames)
             lst = range(n)
         else:
-            lst = list([joints])
+            lst = list(joints)
         for i in lst:
           name = self.JointNames[i]
           self._command.kp_position[i]  = self._default_gains[name]['p']
@@ -146,7 +146,7 @@ class JointCommands_msg_handler(object):
             return
         name = self.JointNames[joint_num]
         self._command.position[joint_num] = float(pos)
-        self.reset_gains(joint_num)
+        self.reset_gains([joint_num])
 
     def set_eff(self,joint,eff,null_gains = True):
         if type(joint) == int:

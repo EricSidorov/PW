@@ -51,17 +51,17 @@ class PW_seq():
         self.SitDwnSeq1[5] = self.BaseHipZ#0.1 ######### NEW #########
         self.SitDwnSeq1[5+6] = -self.BaseHipZ#-0.1 ######### NEW #########
         # self.SitDwnSeq1[5] = self.SitDwnSeq1[5+6] = 0 ######### NEW #########
-        self.SitDwnSeq1[6] = self.SitDwnSeq1[6+6] = -1.2
-        self.SitDwnSeq1[7] = self.SitDwnSeq1[7+6] = 2.45
-        self.SitDwnSeq1[8] = self.SitDwnSeq1[8+6] = -0.2
-        self.SitDwnSeq1[16] = self.SitDwnSeq1[16+6] = 1.0
-        self.SitDwnSeq1[17] = -1.0
-        self.SitDwnSeq1[17+6] = 1.0
+        self.SitDwnSeq1[6] = self.SitDwnSeq1[6+6] = -1.5
+        self.SitDwnSeq1[7] = self.SitDwnSeq1[7+6] = 2.0
+        self.SitDwnSeq1[8] = self.SitDwnSeq1[8+6] = -0.4
+        self.SitDwnSeq1[16] = self.SitDwnSeq1[16+6] = 1.1
+        self.SitDwnSeq1[17] = -1.4
+        self.SitDwnSeq1[17+6] = 1.4
         self.SitDwnSeq1[18] = self.SitDwnSeq1[18+6] = 2.2
         # self.SitDwnSeq1[21] = -0.1
         # self.SitDwnSeq1[21+6] = 0.1
-        self.SitDwnSeq1[19] = 0.1
-        self.SitDwnSeq1[19+6] = -0.1
+        self.SitDwnSeq1[19] = 0.3
+        self.SitDwnSeq1[19+6] = -0.3
         self.SitDwnSeq1[20] = self.SitDwnSeq1[20+6] = 1.5
         self.SitDwnSeq1[21] = 0.
         self.SitDwnSeq1[21+6] = -0.
@@ -70,8 +70,14 @@ class PW_seq():
         self.SitDwnSeq2[1] = 0.5
         self.SitDwnSeq2[6] = self.SitDwnSeq2[6+6] = -1.6
         self.SitDwnSeq2[7] = self.SitDwnSeq2[7+6] = 2.0
+        self.SitDwnSeq2[8] = self.SitDwnSeq2[8+6] = -0.2
         self.SitDwnSeq2[9] = -self.BaseHipZ/2
         self.SitDwnSeq2[9+6] = self.BaseHipZ/2
+        self.SitDwnSeq2[16] = self.SitDwnSeq2[16+6] = 1.0
+        self.SitDwnSeq2[17] = -1.0
+        self.SitDwnSeq2[17+6] = 1.0
+        self.SitDwnSeq2[19] = 0.1
+        self.SitDwnSeq2[19+6] = -0.1
 
         ##################################################################
         ################# Crab Forward Walking Sequence ##################
