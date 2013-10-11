@@ -37,7 +37,7 @@ class cb_joints(object):
         return self._jnt
 
 class Contact(object):
-    def __init__(self,treshold,buf_len,avg_window = 5):
+    def __init__(self,treshold,buf_len,avg_window = 45):
         self._treshold = treshold
         self._contact = False
         self._buffer = [False]*buf_len
