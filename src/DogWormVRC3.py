@@ -888,8 +888,11 @@ class DW_Controller(object):
         self.JC.set_gains("r_arm_usy",20,0,15,set_default = False)
         ##
         self.JC.send_command()
-        while self.IsStanding() == False:
+
+        t_st = rospy.get_time()
+        while (self.IsStanding() == False) and (rospy.get_time - t_st <= 2):
             rospy.sleep(0.05)
+
         rospy.sleep(T*0.2)
         ##
         self.JC.reset_gains([7,13,16,17,19,22,23,25])
@@ -1030,7 +1033,7 @@ class DW_Controller(object):
 
         if self.last_seq != "FWD":
             self.Print("Getting ready",'debug2')
-            self.CurSeqStep = 4
+            self.CurSeqStep = 0
             self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[self.CurSeqStep],1,0.005)
             # rospy.sleep(1)
             self.CheckTipping()
