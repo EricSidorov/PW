@@ -2061,14 +2061,14 @@ class DW_Controller(object):
             Throttles = [0.5, 1, 2, 4]
             for ls in LegSpread:
                 for thr in Throttles:
-                    params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                    self.TestSingles(params,Results)
-                    params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                    self.TestSingles(params,Results)
-                    params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                    self.TestSingles(params,Results)
-                    params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                    self.TestSingles(params,Results)
+                    # params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    # self.TestSingles(params,Results)
+                    # params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    # self.TestSingles(params,Results)
+                    # params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    # self.TestSingles(params,Results)
+                    # params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    # self.TestSingles(params,Results)
 
                     params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                     self.TestSingles(params,Results)
