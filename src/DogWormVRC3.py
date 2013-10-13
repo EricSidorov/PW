@@ -890,7 +890,7 @@ class DW_Controller(object):
         self.JC.send_command()
 
         t_st = rospy.get_time()
-        while (self.IsStanding() == False) and (rospy.get_time - t_st <= 2):
+        while (self.IsStanding() == False) and (rospy.get_time() - t_st <= 2):
             rospy.sleep(0.05)
 
         rospy.sleep(T*0.2)
