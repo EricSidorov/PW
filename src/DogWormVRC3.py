@@ -788,15 +788,16 @@ class DW_Controller(object):
         self.JC.send_command()
 
 
-    def reset(self):
+    def reset(self, targ_pos = [0,-11.02,0.93]): #[0,0,0.92]
         Distance = 1
         Try = 1
+        self.Print("Reset try number %d" % Try,'debug1')
         while Distance > 0.03:
             self.Print("Reset try number %d" % Try,'debug1')
             self.reset_srv()
-            rospy.sleep(0.5)
+            rospy.sleep(1)
 
-            COMDist = (self.GlobalPos.x-0)**2+(self.GlobalPos.y-0)**2+(self.GlobalPos.z-0.92)**2
+            COMDist = (self.GlobalPos.x-targ_pos[0])**2+(self.GlobalPos.y-targ_pos[1])**2+(self.GlobalPos.z-targ_pos[2])**2
             joints = self.RS.GetJointPos()
             BackDist = joints[0]**2+joints[1]**2+joints[2]**2
             Distance = math.sqrt(COMDist+20*BackDist)
@@ -807,7 +808,7 @@ class DW_Controller(object):
                 rospy.sleep(0.5)
                 self.Interface_cb(String('gravec 0 0'))
                 self.reset_srv()
-                rospy.sleep(0.5)
+                rospy.sleep(1)
                 Try = 1
 
 
@@ -912,89 +913,78 @@ class DW_Controller(object):
             pass# self.GoToPoint(Point)
             
     def GoToPoint(self,Point):
-        self._Point = Point
-
         # keep on loggin' in the free world
+        self.goto_logger.set_path('','goto_log_'+Point[2])
         self.goto_falls = 0;
         self.goto_T_start = rospy.Time.now().to_sec()
+
         self.goto_logger.Active(True)
         
         while (0 == self.GlobalPos):
             rospy.sleep(1)
             self.Print("Waiting for GlobalPos",'system')
-        while self.PerformStep(Point) == 'going':
-            pass
-
-        # DeltaPos = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
-        # Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
-
-        # # Get current orientation
-        # y,p,r = self.current_ypr()
-        # T_ori = math.atan2(DeltaPos[1],DeltaPos[0])
-        # self.DesOri = T_ori
-        # if self._Point[2] == "bwd":
-        #     T_ori += math.pi
-        # # Rotate in place towards target
-        # if abs(self.DeltaAngle(T_ori,y))>0.1:
-        #     self.RotateToOri(T_ori)
-
-        # # Crawl towards target
-        # if self._Point[2] == "fwd":
-        #     self.Crawl()
-        # if self._Point[2] == "bwd":
-        #     self.BackCrawl()
-
-        # self._stuck_counter = 0
-
-
-    def PerformStep(self,point):
-        result = 'going'
-        self.count_total +=1
-        self.Print(('Total_count:', self.count_total),'debug1')
-        # Calculate distance and orientation to target
-        DeltaPos = [self._Point[0]-self.GlobalPos.x,self._Point[1]-self.GlobalPos.y]
-        Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
-        T_ori = math.atan2(DeltaPos[1],DeltaPos[0])
-        self.DesOri = T_ori
-        if self._Point[2] == "bwd":
-            T_ori += math.pi
-
-        if Distance<0.8:
-            self.Print("Reached Waypoint",'system2')
-            result = 'done'
-        else:
-            y,p,r = self.current_ypr()
-            # Check tipping
-            self.Print(('check tipping'),'debug1')
-            recovered = self.CheckTipping()
-            print recovered
-            if recovered == -1:
-                self.Print("Gave up",'system2')
-                return 'stuck'
-            if self.last_seq == 'RECOVER':
-                if self._Point[2] == "fwd":
-                    self.Crawl()
-                if self._Point[2] == "bwd":
-                    self.BackCrawl()
-            # Rotate in place towards target
-            if self._fall_count < self.FALL_LIMIT:
-              # Crawl towards target
+        status = 'going'
+         # set max recovery attempts 
+        Temp_max_recover = self.gait_params['MaxRecover']
+        self.gait_params['MaxRecover'] = 5
+        while status == 'going':
+            # Calculate distance and orientation to target
+            DeltaPos = [Point[0]-self.GlobalPos.x,Point[1]-self.GlobalPos.y]
+            Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
+            T_ori = math.atan2(DeltaPos[1],DeltaPos[0])
+            self.DesOri = T_ori
+            # for bwd crawl add pi/2 to ori
+            #check reached target
+            if Distance<0.8:
+                self.Print("Reached Waypoint",'system2')
+                status = 'done'
+            else:
+                y,p,r = self.current_ypr()
+                Drift = abs(self.DeltaAngle(T_ori,y))
+                #adjust orientation
+                if (0.5<Drift<1.4 and Distance>1) or Drift>1.4:
+                    self.RotateToOri(T_ori)
+                # Crawl towards target
                 if Point[2] == "fwd":
                     self.Crawl()
                 if Point[2] == "bwd":
                     self.BackCrawl()
-
+                #check if fell
                 if not self.IsStanding():
                     if self.CheckTipping() == -1:
                         #failed to recover
                         self.Print(('I fell and i cant get up'),'system')
                         status = 'failed'
-                DeltaPos2 = [Point[0]-self.GlobalPos.x,Point[1]-self.GlobalPos.y]
-                Distance2 = math.sqrt(DeltaPos2[0]**2+DeltaPos2[1]**2)
+            # #update current pos
+            # DeltaPos2 = [Point[0]-self.GlobalPos.x,Point[1]-self.GlobalPos.y]
+            # Distance2 = math.sqrt(DeltaPos2[0]**2+DeltaPos2[1]**2)
+
         # restore max recovery attempts 
         self.gait_params['MaxRecover'] = Temp_max_recover
         # stop loggin'
         self.goto_logger.Active(False)
+        
+    def MakeStep(self,Ori,Dir):
+        if Dir == "bwd":
+            Ori += math.pi
+        y,p,r = self.current_ypr()
+        Drift = abs(self.DeltaAngle(Ori,y))
+        #adjust orientation
+        if (0.5<Drift<1.4 and Distance>1) or Drift>1.4:
+            self.RotateToOri(T_ori)
+        # Crawl towards target
+        if Dir == "fwd":
+            self.Crawl()
+        if Dir == "bwd":
+            self.BackCrawl()
+        #check if fell
+        if not self.IsStanding():
+            if self.CheckTipping() == -1:
+                #failed to recover
+                self.Print(('I fell and i cant get up'),'system')
+
+
+
     def Crawl(self):
         # self.IMU_mon.turned = 0
         if self.Responses['bearing'] == 1:
@@ -1191,69 +1181,69 @@ class DW_Controller(object):
 
 
     def RotateToOri(self,Bearing):
-        if self._terrain == "MUD" or self._terrain == "HILLS":
-            return self.RotateToOriInMud(Bearing)
-        else:
-            # Make sure Bearing is from -pi to +pi
-            Bearing = Bearing % (2*math.pi)
-            if Bearing > math.pi:
-                Bearing -= 2*math.pi
-            if Bearing < -math.pi:
-                Bearing += 2*math.pi
+        # if self._terrain == "MUD" or self._terrain == "HILLS":
+        #     return self.RotateToOriInMud(Bearing)
 
-            # Get into "break-dance" configuration
-            pos=copy(self.RobotCnfg[2][:])
-            pos[1] = 0.9
-            pos[6] = pos[6+6] = -1.7
-            pos[8] = pos[8+6] = 0.7
-            pos[16] = pos[16+6] = 0.9
-            pos[17] = -0.9
-            pos[17+6] = 0.9
-            pos[18] = pos[18+6] = 2
-            pos[19] = 1.0
-            pos[19+6] = -1.0
-            self.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01)
-            self.last_seq = "FROT"
+        # Make sure Bearing is from -pi to +pi
+        Bearing = Bearing % (2*math.pi)
+        if Bearing > math.pi:
+            Bearing -= 2*math.pi
+        if Bearing < -math.pi:
+            Bearing += 2*math.pi
 
+        # Get into "break-dance" configuration
+        pos=copy(self.RobotCnfg[2][:])
+        pos[1] = 0.9
+        pos[6] = pos[6+6] = -1.7
+        pos[8] = pos[8+6] = 0.7
+        pos[16] = pos[16+6] = 0.9
+        pos[17] = -0.9
+        pos[17+6] = 0.9
+        pos[18] = pos[18+6] = 2
+        pos[19] = 1.0
+        pos[19+6] = -1.0
+        self.send_pos_traj(self.RS.GetJointPos(),pos,1,0.01)
+        self.last_seq = "FROT"
+
+        # Get current orientation
+        y0,p,r = self.current_ypr()
+        Angle=self.DeltaAngle(Bearing,y0)
+
+        icount = 0
+        while abs(Angle)>0.3:#0.15: # Error of 9 degrees
+            self.Print(('Delta: ',Angle,'Bearing: ',Bearing, 'yaw: ',y0),'debug1')
+            Delta = Angle/0.75
+            if abs(Delta)>1:
+                Delta/=abs(Delta)
+            if 0<Delta<0.35:
+                Delta+=0.25
+            if -0.35<Delta<0:
+                Delta-=0.25
+
+            self.RotSpotSeq(Delta)
+
+            # Check tipping
+            self.CheckTipping()
+            
             # Get current orientation
-            y0,p,r = self.current_ypr()
+            y,p,r = self.current_ypr()
+            if abs(self.DeltaAngle(y,y0))<0.1:
+                icount = icount+1
+                if icount>2:
+                    # Robot isn't turning, try RotateInMud
+                    return self.RotateToOriInMud(Bearing)
+                else:
+                    self.Print("Rotation failed, attempt %d" % icount,'debug1')
+
+            y0 = y
             Angle=self.DeltaAngle(Bearing,y0)
 
-            icount = 0
-            while abs(Angle)>0.3:#0.15: # Error of 9 degrees
-                self.Print(('Delta: ',Angle,'Bearing: ',Bearing, 'yaw: ',y0),'debug1')
-                Delta = Angle/0.75
-                if abs(Delta)>1:
-                    Delta/=abs(Delta)
-                if 0<Delta<0.35:
-                    Delta+=0.25
-                if -0.35<Delta<0:
-                    Delta-=0.25
-
-                self.RotSpotSeq(Delta)
-
-                # Check tipping
-                self.CheckTipping()
-                
-                # Get current orientation
-                y,p,r = self.current_ypr()
-                if abs(self.DeltaAngle(y,y0))<0.1:
-                    icount = icount+1
-                    if icount>2:
-                        # Robot isn't turning, try RotateInMud
-                        return self.RotateToOriInMud(Bearing)
-                    else:
-                        self.Print("Rotation failed, attempt %d" % icount,'debug1')
-
-                y0 = y
-                Angle=self.DeltaAngle(Bearing,y0)
-
-            # Return to original configuration
-            self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1][:],1,0.01)
-            rospy.sleep(0.5)
-            self.CurSeqStep = 0
-            self.CurSeqStep2 = 0
-            return 1
+        # Return to original configuration
+        self.send_pos_traj(self.RS.GetJointPos(),self.RobotCnfg[-1][:],1,0.01)
+        rospy.sleep(0.5)
+        self.CurSeqStep = 0
+        self.CurSeqStep2 = 0
+        return 1
 
 
     def RotateToOriInMud(self,Bearing):
@@ -1528,10 +1518,10 @@ class DW_Controller(object):
                 num_contacts+=int(con.GetState())
             if num_contacts >= 3:
                 Result = True
-                print 'contacts - true'
+                # print 'contacts - true'
             else:
                 Result = False
-                print 'contacts - false'
+                # print 'contacts - false'
 
         # Previous orientation test
         y,p,r = self.current_ypr()
@@ -2120,6 +2110,10 @@ class DW_Controller(object):
                    'dYaw':dYaw,
                    'dT':dT}
         Results.append(ThisRes)
+
+
+
+
 
 
     def Test(self,TestID):
