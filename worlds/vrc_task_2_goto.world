@@ -1,0 +1,144 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <world name="vrc_task_2_simple">
+    <gui>
+      <camera name="user_camera">
+        <pose>9.523820 -48.992300 11.518500 0.000000 0.431643 2.004190</pose>
+      </camera>
+    </gui>
+    <scene>
+      <ambient>0.2 0.2 0.2 1.0</ambient>
+    </scene>
+    <physics type="ode">
+      <gravity>0 0 -9.81</gravity>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>50</iters>
+          <sor>1.4</sor>
+        </solver>
+        <constraints>
+          <cfm>0.0</cfm>
+          <erp>0.2</erp>
+          <contact_max_correcting_vel>100.0</contact_max_correcting_vel>
+          <contact_surface_layer>0.0</contact_surface_layer>
+        </constraints>
+      </ode>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <max_step_size>0.001</max_step_size>
+    </physics>
+    <!-- Light Source -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 100 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>0.2 0.0 -1.0</direction>
+    </light>
+
+    <include>
+      <uri>model://vrc_heightmap_2</uri>
+    </include>
+
+    <include>
+      <uri>model://gate</uri>
+      <name>gate_1</name>
+      <pose>0 -22 2.0 0 0 1.5707</pose>
+    </include>
+
+    <include>
+      <uri>model://gate</uri>
+      <name>gate_2</name>
+      <pose>0 -10.5 2.0 0 0 1.5707</pose>
+    </include>
+
+    <include>
+      <uri>model://gate</uri>
+      <name>gate_3</name>
+      <pose>6.0 6.5 2.0 0 0 1.5707</pose>
+    </include>
+
+
+    <include>
+      <uri>model://mud_atlas</uri>
+      <name>mud_atlas</name>
+      <pose>0.5 -16.6 -.38 0 0 0</pose>
+    </include>
+
+    <model name="mud_ground_plane">
+      <static>true</static>
+      <pose>0.0 0.0 -0.59 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>.3</mu>
+                <mu2>.3</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <cast_shadows>false</cast_shadows>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+          <script>
+            <uri>model://mud_box/materials/scripts</uri>
+            <uri>model://mud_box/materials/textures</uri>
+            <name>vrc/mud</name>
+          </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <include>
+      <uri>model://atlas_sandia_hands</uri>
+      <!-- <pose>-3 -38 1.1 0 0 0</pose> -->
+      <!-- <pose>0 -22 1.1 0 0 1.5708</pose> --> <!-- Start from just behind mud in-slope -->
+      <!-- <pose>0 -15 0.5 0 0 -1.5708</pose> --> <!-- Start from just behind mud out-slope, facing back -->
+      <pose>0 -11 1.03 0 0 3.14</pose><!-- Start from just after mud out-slope -->
+
+    </include>
+    <plugin filename="libVRCPlugin.so" name="vrc_plugin">
+      <atlas>
+        <model_name>atlas</model_name>
+        <pin_link>utorso</pin_link>
+      </atlas>
+      <drc_vehicle>
+        <model_name>golf_cart</model_name>
+        <seat_link>chassis</seat_link>
+      </drc_vehicle>
+      <drc_fire_hose>
+        <fire_hose_model>fire_hose</fire_hose_model>
+        <coupling_link>coupling</coupling_link>
+        <standpipe_model>standpipe</standpipe_model>
+        <spout_link>standpipe</spout_link>
+        <thread_pitch>-1000</thread_pitch>
+        <coupling_relative_pose>1.17038e-05 -0.125623 0.35 -0.0412152 -1.57078 1.61199</coupling_relative_pose>
+      </drc_fire_hose>
+    </plugin>
+    <plugin filename="libGPlugin.so" name="Gplugin"/>
+    <!-- <plugin filename="libVRCScoringPlugin.so" name="vrc_scoring">
+      <score_file>/tmp/vrc_task_2/score.log</score_file>
+    </plugin> -->
+  </world>
+</sdf>
