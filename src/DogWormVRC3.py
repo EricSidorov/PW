@@ -866,10 +866,10 @@ class DW_Controller(object):
         ##
         # self.JC.set_gains("l_arm_mwx",20,0,15)
         # self.JC.set_gains("r_arm_mwx",20,0,15)
-        self.JC.set_gains("l_arm_shx",10,0,10,set_default = False)
-        self.JC.set_gains("r_arm_shx",10,0,10,set_default = False)
-        self.JC.set_gains("l_arm_elx",10,0,10,set_default = False)
-        self.JC.set_gains("r_arm_elx",10,0,10,set_default = False)
+        self.JC.set_gains("l_arm_shx",15,0,10,set_default = False)
+        self.JC.set_gains("r_arm_shx",15,0,10,set_default = False)
+        self.JC.set_gains("l_arm_elx",15,0,10,set_default = False)
+        self.JC.set_gains("r_arm_elx",15,0,10,set_default = False)
         ##
         pos = copy(self.SitDwnSeq1)
         self.send_pos_traj(self.RS.GetJointPos(),pos,T*0.5,0.005)
@@ -890,7 +890,7 @@ class DW_Controller(object):
         self.JC.send_command()
 
         t_st = rospy.get_time()
-        while (self.IsStanding() == False) and (rospy.get_time() - t_st <= 2):
+        while (self.IsStanding() == False) and (rospy.get_time() - t_st <= 0.3):
             rospy.sleep(0.05)
 
         rospy.sleep(T*0.2)
@@ -1897,7 +1897,7 @@ class DW_Controller(object):
 
 
     def Print(self,string,orig):
-        Verbosity = 4
+        Verbosity = 1
 
         VerbLevels = {'system':0, 'system1':1, 'system2':2, 'comm_out':2, 'debug1':3, 'debug2':4, 'comm_in':4, 'poses':4}
 
@@ -1955,10 +1955,10 @@ class DW_Controller(object):
                     self.BackCrawl()
                 elif TestConfig['seq'] == "SROT":
                     self.RotOnMudSeq(1)
-                    rospy.sleep(0.5)
+                    rospy.sleep(1.5)
                 elif TestConfig['seq'] == "FROT":
                     self.RotSpotSeq(1)
-                    rospy.sleep(0.5)
+                    rospy.sleep(1.5)
 
                 rospy.sleep(0.5)
                 T1 = rospy.get_time()
@@ -2223,7 +2223,7 @@ class DW_Controller(object):
         elif TestID == 6:
             # Test FROT/SROT sequences with different throttles and all inclinations (up/down/left/right)
             NumSteps = 1
-            ke = 0.75
+            ke = 0.5
             ls = 0.5
             Throttles = [0.5, 1, 2]
             for thr in Throttles:
@@ -2252,6 +2252,28 @@ class DW_Controller(object):
             ke = 0.75
             ls = 0.5
             damp = 0
+            Friction = [0.2, 0.4, 0.6, 0.8]
+            for fr in Friction:
+                # Reset friction
+                self.Interface_cb(String('friction 0.8'))
+                params = {'seq':"FROT", 'inc':"NONE", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'fric':fr, 'damping':damp, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+
+                # Reset friction
+                self.Interface_cb(String('friction 0.8'))
+                params = {'seq':"SROT", 'inc':"NONE", 'throttle':thr, 'legspread':ls, 'frotknee':ke, 'fric':fr, 'damping':damp, 'steps': NumSteps}
+                self.TestSingles(params,Results)
+
+            # Reset friction
+            self.Interface_cb(String('friction 0.8'))
+
+        elif TestID == 8:
+            # Test FROT/SROT sequences with different mu on flat plane
+            NumSteps = 2
+            thr = 1
+            ke = 0.75
+            ls = 0.5
+            damp = 120
             Friction = [0.2, 0.4, 0.6, 0.8]
             for fr in Friction:
                 # Reset friction
