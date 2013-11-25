@@ -154,7 +154,7 @@ class PW_seq():
         ThisRobotCnfg[19+6] = -0.3 + 1.3*nSlope # -1.6
         ThisRobotCnfg[20] = ThisRobotCnfg[20+6] = 0 +1.2*nSlope # -1.2
         self.RobotCnfg.append(ThisRobotCnfg)
-        self.StepDur.append((0.3-nSlope)*T) # 1.3*T
+        self.StepDur.append((0.3-nSlope/3)*T) # 1.3*T
 
         # Sequence Step 5: Bring pelvis forward, closer to legs
         ThisRobotCnfg = copy(self.RobotCnfg[3][:]) 

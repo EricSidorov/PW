@@ -1309,16 +1309,16 @@ class DW_Controller(object):
         knee0 = 1.1+(1-Speed)*0.8 # 1.9 -> 1.1
         hip0 = self.BaseHipZ/2
         arm0 = 1.0
-        d_arm = 0.3+0.2*Speed
+        d_arm = 0.6+0.2*Speed
 
         # Init configuration
         pos=copy(self.RobotCnfg[2][:])
         pos[1] = 0.8
-        pos[6] = pos[6+6] = -1.7
+        pos[6] = pos[6+6] = -1.8
         pos[7] = pos[7+6] = knee0
         pos[8] = pos[8+6] = 0.8
         pos[9] = pos[9+6] = 0
-        pos[16] = pos[16+6] = 0.8
+        pos[16] = pos[16+6] = 0.7
         pos[17] = -arm0
         pos[17+6] = arm0
         pos[18] = pos[18+6] = 2.3
@@ -1339,13 +1339,13 @@ class DW_Controller(object):
             dID = 6
         Delta = abs(Delta)
 
-        # Lift first leg (and arm)
+        # Lift first leg (and arms)
         pos[7+dID] = knee0-1
         pos[17+dID] = -sign*(arm0-d_arm)
-        pos[19+dID] = sign*(0.6+d_arm)
+        pos[19+dID] = sign*(0.6+0.8*d_arm)
         pos[17+6-dID] = sign*(arm0-d_arm)
-        pos[19+6-dID] = -sign*(0.6+d_arm)
-        pos[18] = pos[18+6] = 2.4+0.4*(1-Speed)
+        pos[19+6-dID] = -sign*(0.6+0.8*d_arm)
+        pos[18] = pos[18+6] = 2.3+0.4*(1-Speed)
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
 
         # Rotate first leg outwards until it touches ground
@@ -1376,7 +1376,7 @@ class DW_Controller(object):
         pos[19+dID] = sign*(0.6)
         pos[17+6-dID] = sign*(arm0)
         pos[19+6-dID] = -sign*(0.6)
-        pos[18] = pos[18+6] = 2.3
+        pos[18] = pos[18+6] = 2.2
         self.send_pos_traj(self.RS.GetJointPos(),pos,0.12*T,0.005) 
         rospy.sleep(0.1*T)
 
@@ -1508,7 +1508,7 @@ class DW_Controller(object):
             hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
             if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
                 Result = True
-                print 'rot: contacts - true'
+                self.Print('rot: contacts - true','debug1')
             else:
                 self.Print("Waiting 0.5 secs",'debug2')
                 rospy.sleep(0.5)
@@ -1516,7 +1516,7 @@ class DW_Controller(object):
                 hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
                 if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
                     Result = True
-                    print 'rot2: contacts - true'
+                    self.Print('rot2: contacts - true','debug1')
                 else:
                     R,P,Y = self.RS._orientation.GetRPY()
                     if abs(R) < 0.3:
@@ -1528,17 +1528,17 @@ class DW_Controller(object):
                 num_contacts+=int(con.GetState())
             if num_contacts >= 3:
                 Result = True
-                print 'contacts - true'
+                self.Print('contacts - true','debug1')
             else:
                 Result = False
-                print 'contacts - false'
+                self.Print('contacts - false','debug1')
 
         # Previous orientation test
         y,p,r = self.current_ypr()
         delta = 30*math.pi/180
         if Result == False:
             if abs(p-self._last_ori[1])<=delta and abs(r-self._last_ori[2])<=delta:
-                print 'but orientation is fine, returning true'
+                self.Print('but orientation is fine, returning true','debug1')
                 return True
         else:
             if abs(p-self._last_ori[1])<=delta and abs(r-self._last_ori[2])<=delta:
@@ -1897,7 +1897,7 @@ class DW_Controller(object):
 
 
     def Print(self,string,orig):
-        Verbosity = 4
+        Verbosity = 1
 
         VerbLevels = {'system':0, 'system1':1, 'system2':2, 'comm_out':2, 'debug1':3, 'debug2':4, 'comm_in':4, 'poses':4}
 
@@ -2132,14 +2132,14 @@ class DW_Controller(object):
             Throttles = [0.5, 1, 2, 4]
             for ls in LegSpread:
                 for thr in Throttles:
-                    # params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                    # self.TestSingles(params,Results)
-                    # params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                    # self.TestSingles(params,Results)
-                    # params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                    # self.TestSingles(params,Results)
-                    # params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
-                    # self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"UP", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"LEFT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
+                    params = {'seq':"BWD", 'inc':"RIGHT", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+                    self.TestSingles(params,Results)
 
                     params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
                     self.TestSingles(params,Results)
@@ -2180,9 +2180,10 @@ class DW_Controller(object):
             self.Responses['slope'] = 1
 
             NumSteps = 2
-            thr = 1
-            ls = 1
-            params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':ls, 'steps': NumSteps}
+            thr = 2
+            params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':0.25, 'steps': NumSteps}
+            self.TestSingles(params,Results)
+            params = {'seq':"FWD", 'inc':"DOWN", 'throttle':thr, 'legspread':1, 'steps': NumSteps}
             self.TestSingles(params,Results)
 
             # Reset response
