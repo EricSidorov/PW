@@ -33,7 +33,7 @@
           <geometry>
             <heightmap>
               <uri>model://playground_hm/bitmap/playground1.png</uri>
-              <size>15 15 5</size>
+              <size>5 5 0.5</size>
               <pos>0 0 0</pos>
             </heightmap>
           </geometry>
@@ -65,7 +65,7 @@
                 <fade_dist>5</fade_dist>
               </blend>
               <uri>model://playground_hm/bitmap/playground1.png</uri>
-              <size>15 15 5</size>
+              <size>5 5 0.5</size>
               <pos>0 0 0</pos>
             </heightmap>
           </geometry>
