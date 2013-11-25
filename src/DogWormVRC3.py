@@ -43,6 +43,26 @@ from FricPlugin.srv import *
 import subprocess
 import signal
 
+class StuckCounter(object):
+    """docstring for StuckCounter"""
+    def __init__(self, max_stuck):
+        super(StuckCounter, self).__init__()
+        self.stuck = 0
+        self.lvl = 0
+        self.MAX_STUCK = max_stuck
+    def GotStuck(self):
+        self.stuck += 1
+        if self.stuck > self.MAX_STUCK:
+            self.lvl += 1
+            self.stuck = 0
+            return 1
+        return 0
+    def Reset(self,rst_lvl = True):
+        self.stuck = 0
+        if rst_lvl:
+            self.lvl = 0
+
+        
 class Logger(object):
     def __init__(self,dir_path,file_name):
         self._on = False
@@ -914,12 +934,18 @@ class DW_Controller(object):
             
     def GoToPoint(self,Point):
         # keep on loggin' in the free world
+        Frust_pt = [self.GlobalPos.x,self.GlobalPos.y]
+        Stck_pt = [self.GlobalPos.x,self.GlobalPos.y]
         self.goto_logger.set_path('','goto_log_'+Point[2])
         self.goto_falls = 0;
         self.goto_T_start = rospy.Time.now().to_sec()
-
         self.goto_logger.Active(True)
-        
+        stck_cnt = StuckCounter(max_stuck = 2)
+        dis_walked = 0.
+        D = [0,2,4,2]
+        tol = 0.2
+        if Point[2] == 'bwd':
+            tol = 0.1
         while (0 == self.GlobalPos):
             rospy.sleep(1)
             self.Print("Waiting for GlobalPos",'system')
@@ -931,47 +957,68 @@ class DW_Controller(object):
             # Calculate distance and orientation to target
             DeltaPos = [Point[0]-self.GlobalPos.x,Point[1]-self.GlobalPos.y]
             Distance = math.sqrt(DeltaPos[0]**2+DeltaPos[1]**2)
+            y,p,r = self.current_ypr()
             T_ori = math.atan2(DeltaPos[1],DeltaPos[0])
+            if Point[2] == "bwd":
+                T_ori += math.pi
+            Drift = abs(self.DeltaAngle(T_ori,y))
+
+            Rotate = False
+
+            if (0.5<Drift<1.4 and Distance>1) or Drift>1.4 or stck_cnt.lvl:
+                Rotate = True
+
             self.DesOri = T_ori
-            # for bwd crawl add pi/2 to ori
+            ori_list = [T_ori,T_ori+math.pi/2,T_ori-math.pi/2,T_ori + math.pi]
             #check reached target
             if Distance<0.8:
                 self.Print("Reached Waypoint",'system2')
                 status = 'done'
             else:
-                y,p,r = self.current_ypr()
-                Drift = abs(self.DeltaAngle(T_ori,y))
-                #adjust orientation
-                if (0.5<Drift<1.4 and Distance>1) or Drift>1.4:
-                    self.RotateToOri(T_ori)
-                # Crawl towards target
-                if Point[2] == "fwd":
-                    self.Crawl()
-                if Point[2] == "bwd":
-                    self.BackCrawl()
-                #check if fell
-                if not self.IsStanding():
-                    if self.CheckTipping() == -1:
-                        #failed to recover
-                        self.Print(('I fell and i cant get up'),'system')
-                        status = 'failed'
-            # #update current pos
-            # DeltaPos2 = [Point[0]-self.GlobalPos.x,Point[1]-self.GlobalPos.y]
-            # Distance2 = math.sqrt(DeltaPos2[0]**2+DeltaPos2[1]**2)
+                cur_pos = np.array([self.GlobalPos.x,self.GlobalPos.y])
+                #forget old stuck counts
+                if stck_cnt.stuck and linalg.norm(cur_pos - Stck_pt) > 2:
+                    stck_cnt.Reset(rst_lvl = False)
+                    print 'Departed from last stuck point, stuck counter reset (lvl not reset)'
+                #orientation for next step
+                Ori = ori_list[stck_cnt.lvl]
+                #make step
+                delta = self.MakeStep(Ori,Point[2],Rotate = Rotate)
+                print 'delta: ',delta
+                #if we walk in stuck mode
+                if stck_cnt.lvl:
+                    dis_walked = linalg.norm(cur_pos - Frust_pt)
+                    print 'Exiting stuck position, walked ', dis_walked, 'out of ', D[stck_cnt.lvl]
+                    if dis_walked >= D[stck_cnt.lvl]:
+                        dis_walked = 0.
+                        stck_cnt.Reset()
+                        print 'stuck_counter reset'
+                if delta <= tol:
+                    print 'increasing stuck_counter'
+                    Stck_pt = np.array([self.GlobalPos.x,self.GlobalPos.y])
+                    #increase stuck counter, if frustration lvl increased reset dis_walked
+                    if stck_cnt.GotStuck():
+                        dis_walked = 0.
+                        print 'stuck lvl: ',stck_cnt.lvl
+                        Frust_pt = np.array([self.GlobalPos.x,self.GlobalPos.y])
+                    #nothing worked, back to plan A
+                    if stck_cnt.lvl > len(ori_list) - 1:
+                        stck_cnt.Reset()
+                        print 'arrrg, reseting and trying again'
 
         # restore max recovery attempts 
         self.gait_params['MaxRecover'] = Temp_max_recover
         # stop loggin'
         self.goto_logger.Active(False)
-        
-    def MakeStep(self,Ori,Dir):
+
+    def MakeStep(self,Ori,Dir,Rotate = True):
+        dir_vec = np.matrix([np.cos(Ori),np.sin(Ori)])
         if Dir == "bwd":
-            Ori += math.pi
-        y,p,r = self.current_ypr()
-        Drift = abs(self.DeltaAngle(Ori,y))
-        #adjust orientation
-        if (0.5<Drift<1.4 and Distance>1) or Drift>1.4:
-            self.RotateToOri(T_ori)
+            dir_vec = np.matrix([np.cos(Ori-math.pi),np.sin(Ori-math.pi)])
+        #adjust orientation (if asked to)
+        if Rotate:
+            self.RotateToOri(Ori)
+        init_pos = np.matrix([self.GlobalPos.x,self.GlobalPos.y])
         # Crawl towards target
         if Dir == "fwd":
             self.Crawl()
@@ -982,6 +1029,9 @@ class DW_Controller(object):
             if self.CheckTipping() == -1:
                 #failed to recover
                 self.Print(('I fell and i cant get up'),'system')
+        fin_pos = np.matrix([self.GlobalPos.x,self.GlobalPos.y])
+        Del = fin_pos - init_pos
+        return float(dir_vec*Del.transpose())
 
 
 
@@ -1498,7 +1548,7 @@ class DW_Controller(object):
             hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
             if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
                 Result = True
-                print 'rot: contacts - true'
+                # print 'rot: contacts - true'
             else:
                 self.Print("Waiting 0.5 secs",'debug2')
                 rospy.sleep(0.5)
@@ -1506,7 +1556,7 @@ class DW_Controller(object):
                 hand_contacts = self._contacts['l_hand'].GetState() + self._contacts['r_hand'].GetState()
                 if leg_contacts == 2 and (hand_contacts == 0 or hand_contacts == 2):
                     Result = True
-                    print 'rot2: contacts - true'
+                    # print 'rot2: contacts - true'
                 else:
                     R,P,Y = self.RS._orientation.GetRPY()
                     if abs(R) < 0.3:
@@ -1528,7 +1578,7 @@ class DW_Controller(object):
         delta = 30*math.pi/180
         if Result == False:
             if abs(p-self._last_ori[1])<=delta and abs(r-self._last_ori[2])<=delta:
-                print 'but orientation is fine, returning true'
+                # print 'but orientation is fine, returning true'
                 return True
         else:
             if abs(p-self._last_ori[1])<=delta and abs(r-self._last_ori[2])<=delta:
@@ -1887,7 +1937,7 @@ class DW_Controller(object):
 
 
     def Print(self,string,orig):
-        Verbosity = 4
+        Verbosity = 0
 
         VerbLevels = {'system':0, 'system1':1, 'system2':2, 'comm_out':2, 'debug1':3, 'debug2':4, 'comm_in':4, 'poses':4}
 
@@ -2517,8 +2567,7 @@ class DW_Controller(object):
 ##################################################################
 ######################### USAGE EXAMPLE ##########################
 ##################################################################
-
-if __name__=='__main__':
+def start_DW():
     rospy.init_node("DW_test")
     # rospy.sleep(0.5)
     iTF = Interface_tf()
@@ -2535,9 +2584,12 @@ if __name__=='__main__':
     DW.send_pos_traj(DW.RS.GetJointPos(),array(DW.RS.GetJointPos()),0.1,0.005)
     DW.CloseHands()
     rospy.sleep(0.1)
+    return DW
 
+    
+if __name__=='__main__':
+    DW = start_DW()
     signal.signal(signal.SIGALRM, DW.Alarm)
-
     while True:
         comm = raw_input("\033[92mEnter command: \033[0m")
 

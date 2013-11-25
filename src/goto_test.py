@@ -17,7 +17,7 @@ if __name__=='__main__':
     DW.Initialize(Terrain = "HILLS") 
     DW.Throttle = {'FWD': 1.0, 'BWD': 2.0, 'FROT': 1., 'SROT': 1.}
     if crwl_dir == 'fwd':
-        DW.gait_params = {'Slope':0.0,'LegSpread':0.25,'PelvisHeight':0.5,'FRotKnee':0.7,'MaxRecover':1}
+        DW.gait_params = {'Slope':0.0,'LegSpread':0.25,'PelvisHeight':0.25,'FRotKnee':0.7,'MaxRecover':1}
     else:
         if crwl_dir == 'bwd':
             DW.gait_params = {'Slope':0.0,'LegSpread':0.75,'PelvisHeight':0.0,'FRotKnee':0.7,'MaxRecover':1}  
